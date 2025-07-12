@@ -10,13 +10,12 @@ const sdCylinder = tgpu.fn([d.vec3f, d.f32, d.f32], d.f32)((p, r, h) => {
   return std.min(std.max(q.x, q.y), 0) + std.length(std.max(q, d.vec2f()));
 });
 
-const sdCone = tgpu.fn([d.vec3f, d.f32, d.f32], d.f32)((p, h, r) => {
-  const q = d.vec2f(std.length(p.xz), p.y);
-  const c = d.vec2f(r, h);
-  const a = std.mul(q, d.vec2f(c.y, -c.x));
-  const b = std.mul(q, d.vec2f(c.x, c.y));
-  const k = std.select(std.dot(q, c), std.length(q), c.y * q.x > c.x * q.y);
-  return std.length(std.max(a, d.vec2f())) + std.min(k, 0);
+/**
+ * c is the sin/cos of the angle, h is height
+ */
+const sdCone = tgpu.fn([d.vec3f, d.vec2f, d.f32], d.f32)((p, c, h) => {
+  const q = std.length(p.xz);
+  return std.max(std.dot(c.xy, d.vec2f(q, p.y)), -h-p.y);
 });
 
 const smoothstep = tgpu.fn([d.f32, d.f32, d.f32], d.f32)`(a, b, t) {
@@ -214,25 +213,25 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     let tree = trunk;
     
     // Bottom layer
-    const layer1Pos = std.sub(localP, d.vec3f(0, 1.2, 0));
+    const layer1Pos = std.sub(localP, d.vec3f(0, 1.8, 0));
     const layer1 = Shape({
-      dist: sdCone(layer1Pos, 1.2, 0.8),
+      dist: sdCone(layer1Pos, d.vec2f(std.sin(1), std.cos(1)), 1),
       color: d.vec3f(0.1, 0.4, 0.1),
     });
     tree = shapeUnion(tree, layer1);
     
     // Middle layer
-    const layer2Pos = std.sub(localP, d.vec3f(0, 1.8, 0));
+    const layer2Pos = std.sub(localP, d.vec3f(0, 2.4, 0));
     const layer2 = Shape({
-      dist: sdCone(layer2Pos, 1.0, 0.6),
+      dist: sdCone(layer2Pos, d.vec2f(std.sin(1.1), std.cos(1.1)), 1),
       color: d.vec3f(0.15, 0.5, 0.15),
     });
     tree = shapeUnion(tree, layer2);
     
     // Top layer
-    const layer3Pos = std.sub(localP, d.vec3f(0, 2.3, 0));
+    const layer3Pos = std.sub(localP, d.vec3f(0, 3, 0));
     const layer3 = Shape({
-      dist: sdCone(layer3Pos, 0.8, 0.4),
+      dist: sdCone(layer3Pos, d.vec2f(std.sin(1.2), std.cos(1.2)), 1),
       color: d.vec3f(0.2, 0.6, 0.2),
     });
     tree = shapeUnion(tree, layer3);
