@@ -2,7 +2,22 @@ import tgpu from "typegpu";
 import * as d from "typegpu/data";
 import * as std from "typegpu/std";
 import { mat4 } from "wgpu-matrix";
-import { sdBoxFrame3d, sdPlane, sdSphere, sdCylinder, sdCone } from "@typegpu/sdf";
+import { sdBoxFrame3d, sdPlane, sdSphere } from "@typegpu/sdf";
+
+const sdCylinder = tgpu.fn([d.vec3f, d.f32, d.f32], d.f32)((p, r, h) => {
+  const dd = d.vec2f(std.length(p.xz), p.y);
+  const q = d.vec2f(dd.x - r, std.abs(dd.y) - h/2);
+  return std.min(std.max(q.x, q.y), 0) + std.length(std.max(q, d.vec2f()));
+});
+
+const sdCone = tgpu.fn([d.vec3f, d.f32, d.f32], d.f32)((p, h, r) => {
+  const q = d.vec2f(std.length(p.xz), p.y);
+  const c = d.vec2f(r, h);
+  const a = std.mul(q, d.vec2f(c.y, -c.x));
+  const b = std.mul(q, d.vec2f(c.x, c.y));
+  const k = std.select(std.dot(q, c), std.length(q), c.y * q.x > c.x * q.y);
+  return std.length(std.max(a, d.vec2f())) + std.min(k, 0);
+});
 
 const smoothstep = tgpu.fn([d.f32, d.f32, d.f32], d.f32)`(a, b, t) {
   return smoothstep(a, b, t);
