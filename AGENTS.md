@@ -20,6 +20,7 @@
 - Components in `src/components/`
 - Pages in `src/pages/`
 - Content in `src/content/`
+- Shared logic in `src/lib/`
 
 ## Conventions
 - Astro components use `.astro` extension
