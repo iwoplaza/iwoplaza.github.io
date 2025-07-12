@@ -2,7 +2,7 @@ import tgpu from "typegpu";
 import * as d from "typegpu/data";
 import * as std from "typegpu/std";
 import { mat4 } from "wgpu-matrix";
-import { sdBoxFrame3d, sdPlane, sdSphere } from "@typegpu/sdf";
+import { sdBoxFrame3d, sdPlane, sdSphere, sdCylinder, sdCone } from "@typegpu/sdf";
 
 const smoothstep = tgpu.fn([d.f32, d.f32, d.f32], d.f32)`(a, b, t) {
   return smoothstep(a, b, t);
@@ -183,6 +183,48 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     dist: std.min(a.dist, b.dist),
   }));
 
+  const getPineTree = tgpu.fn([d.vec3f], Shape)((p) => {
+    const treePos = d.vec3f(-3, 0, 2);
+    const localP = std.sub(p, treePos);
+    
+    // Trunk
+    const trunkHeight = d.f32(2);
+    const trunkRadius = d.f32(0.15);
+    const trunk = Shape({
+      dist: sdCylinder(localP, trunkRadius, trunkHeight),
+      color: d.vec3f(0.4, 0.2, 0.1),
+    });
+    
+    // Pine tree layers (cones stacked on top of each other)
+    let tree = trunk;
+    
+    // Bottom layer
+    const layer1Pos = std.sub(localP, d.vec3f(0, 1.2, 0));
+    const layer1 = Shape({
+      dist: sdCone(layer1Pos, 1.2, 0.8),
+      color: d.vec3f(0.1, 0.4, 0.1),
+    });
+    tree = shapeUnion(tree, layer1);
+    
+    // Middle layer
+    const layer2Pos = std.sub(localP, d.vec3f(0, 1.8, 0));
+    const layer2 = Shape({
+      dist: sdCone(layer2Pos, 1.0, 0.6),
+      color: d.vec3f(0.15, 0.5, 0.15),
+    });
+    tree = shapeUnion(tree, layer2);
+    
+    // Top layer
+    const layer3Pos = std.sub(localP, d.vec3f(0, 2.3, 0));
+    const layer3 = Shape({
+      dist: sdCone(layer3Pos, 0.8, 0.4),
+      color: d.vec3f(0.2, 0.6, 0.2),
+    });
+    tree = shapeUnion(tree, layer3);
+    
+    return tree;
+  });
+
   const getMorphingShape = tgpu.fn([d.vec3f, d.f32], Shape)((p, t) => {
     // Center position
     const center = d.vec3f(0, 2, 0);
@@ -227,6 +269,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const getSceneDist = tgpu.fn([d.vec3f], Shape)((p) => {
     const shape = getMorphingShape(p, time.$);
+    const tree = getPineTree(p);
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
       color: std.mix(
@@ -236,7 +279,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       ),
     });
 
-    return shapeUnion(shape, floor);
+    const sceneWithTree = shapeUnion(shape, tree);
+    return shapeUnion(sceneWithTree, floor);
   });
 
   const rayMarch = tgpu.fn([d.vec3f, d.vec3f], Shape)((ro, rd) => {
