@@ -14,6 +14,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const uniforms = root.createUniform(
     d.struct({
+      invView: d.mat4x4f,
       invViewProj: d.mat4x4f,
     }),
   );
@@ -23,7 +24,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   function uploadUniforms() {
     const invViewProj = mat4.mul(invView, invProj, d.mat4x4f());
-    uniforms.writePartial({ invViewProj });
+    uniforms.writePartial({ invView, invViewProj });
   }
 
   function resizeCanvas(canvas: HTMLCanvasElement) {
@@ -49,10 +50,11 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   let isDragging = false;
   let prevX = 0;
   let prevY = 0;
+  const orbitOrigin = d.vec3f(0, 2, 0);
   // Yaw and pitch angles facing the origin.
-  let orbitRadius = 23.6;
-  let orbitYaw = -12.78;
-  let orbitPitch = 0.01;
+  let orbitRadius = 2;
+  let orbitYaw = 0;
+  let orbitPitch = 0.4;
 
   function updateCameraOrbit(dx: number, dy: number) {
     console.log({
@@ -71,13 +73,12 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     // basically converting spherical coordinates to cartesian.
     // like sampling points on a unit sphere and then scaling them by the radius.
     const logOrbitRadius = orbitRadius ** 2;
-    const newCamX = logOrbitRadius * Math.sin(orbitYaw) * Math.cos(orbitPitch);
+    const newCamX = logOrbitRadius * -Math.sin(orbitYaw) * Math.cos(orbitPitch);
     const newCamY = logOrbitRadius * Math.sin(orbitPitch);
     const newCamZ = logOrbitRadius * Math.cos(orbitYaw) * Math.cos(orbitPitch);
-    const newCameraPos = d.vec4f(newCamX, newCamY, newCamZ, 1);
+    const newCameraPos = std.add(d.vec3f(newCamX, newCamY, newCamZ), orbitOrigin);
 
-    // TODO: Update inv-view
-    // view = mat4.lookAt(newCameraPos, d.vec3f(0), d.vec3f(0, 1, 0), d.mat4x4f());
+    invView = mat4.aim(newCameraPos, orbitOrigin, d.vec3f(0, 1, 0), d.mat4x4f());
     uploadUniforms();
   }
 
@@ -184,7 +185,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const getMorphingShape = tgpu.fn([d.vec3f, d.f32], Shape)((p, t) => {
     // Center position
-    const center = d.vec3f(0, 2, 6);
+    const center = d.vec3f(0, 2, 0);
     const localP = std.sub(p, center);
     const rotMatZ = d.mat4x4f.rotationZ(-t);
     const rotMatX = d.mat4x4f.rotationX(-t * 0.6);
@@ -323,7 +324,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const uv = std.sub(std.mul(input.uv, 2), 1);
 
     // Ray origin and direction
-    const ro = d.vec3f(0, 2, 3);
+    const ro = std.mul(uniforms.$.invView, d.vec4f(0, 0, 0, 1)).xyz;
     const rd = std.normalize(std.mul(uniforms.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz);
 
     const march = rayMarch(ro, rd);
@@ -369,7 +370,9 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   });
 
   let animationFrame: number;
-  function run() {
+  function run(timestamp: number) {
+    time.write(timestamp / 1000 % 1000);
+
     renderPipeline
       .withColorAttachment({
         view: context.getCurrentTexture().createView(),
