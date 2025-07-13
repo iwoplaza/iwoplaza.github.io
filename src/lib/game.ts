@@ -2,7 +2,7 @@ import { sdPlane } from '@typegpu/sdf';
 import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
-import { mat4 } from 'wgpu-matrix';
+import { createOrbitCamera } from './camera.ts';
 import { createFrog } from './frog.ts';
 import {
   AABB,
@@ -16,41 +16,40 @@ import {
   sortHits,
 } from './sdf.ts';
 
+const pixelation = 4;
+const INSPECT = false;
+const gameCameraOptions = {
+  radius: 5,
+  yaw: -Math.PI / 4,
+  pitch: 0.8,
+};
+const inspectCameraOptions = {
+  radius: 2,
+  yaw: 0,
+  pitch: 0,
+};
+
 export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   const root = await tgpu.init();
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
-  const uniforms = root.createUniform(
-    d.struct({
-      invView: d.mat4x4f,
-      invViewProj: d.mat4x4f,
-    }),
+  const camera = createOrbitCamera(
+    root,
+    canvas,
+    INSPECT ? inspectCameraOptions : gameCameraOptions,
   );
 
   // Create uniform for AABBs
   const sceneAABBs = root.createUniform(d.arrayOf(AABB, MAX_AABBS));
   const numAABBs = root.createUniform(d.u32);
 
-  const invProj = mat4.identity(d.mat4x4f());
-  let invView = mat4.identity(d.mat4x4f());
-
-  function uploadUniforms() {
-    const invViewProj = mat4.mul(invView, invProj, d.mat4x4f());
-    uniforms.writePartial({ invView, invViewProj });
-  }
-
   function resizeCanvas(canvas: HTMLCanvasElement) {
     const devicePixelRatio = window.devicePixelRatio;
-    const width = (window.innerWidth * devicePixelRatio) / 4;
-    const height = (window.innerHeight * devicePixelRatio) / 4;
+    const width = (window.innerWidth * devicePixelRatio) / pixelation;
+    const height = (window.innerHeight * devicePixelRatio) / pixelation;
     canvas.width = width;
     canvas.height = height;
-
-    const aspect = canvas.width / canvas.height;
-    const fov = (30 / 180) * Math.PI;
-    mat4.identity(invProj);
-    mat4.scale(invProj, d.vec3f(aspect, 1, 1 / Math.tan(fov)), invProj);
-    uploadUniforms();
+    camera.updateProjection(width, height);
   }
 
   resizeCanvas(canvas);
@@ -58,109 +57,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     resizeCanvas(canvas);
   });
   resizeObserver.observe(canvas);
-
-  let isDragging = false;
-  let prevX = 0;
-  let prevY = 0;
-  const orbitOrigin = d.vec3f(0, 4, 0);
-  // Yaw and pitch angles facing the origin.
-  // let orbitRadius = 2;
-  // let orbitYaw = 0;
-  // let orbitPitch = 0;
-  let orbitRadius = 5;
-  let orbitYaw = -Math.PI / 4;
-  let orbitPitch = 0.8;
-
-  function updateCameraOrbit(dx: number, dy: number) {
-    const orbitSensitivity = 0.005;
-    orbitYaw += -dx * orbitSensitivity;
-    orbitPitch += dy * orbitSensitivity;
-    // if we didn't limit pitch, it would lead to flipping the camera which is disorienting.
-    const maxPitch = Math.PI / 2 - 0.01;
-    if (orbitPitch > maxPitch) orbitPitch = maxPitch;
-    if (orbitPitch < -maxPitch) orbitPitch = -maxPitch;
-    // basically converting spherical coordinates to cartesian.
-    // like sampling points on a unit sphere and then scaling them by the radius.
-    const logOrbitRadius = orbitRadius ** 2;
-    const newCamX = logOrbitRadius * -Math.sin(orbitYaw) * Math.cos(orbitPitch);
-    const newCamY = logOrbitRadius * Math.sin(orbitPitch);
-    const newCamZ = logOrbitRadius * Math.cos(orbitYaw) * Math.cos(orbitPitch);
-    const newCameraPos = std.add(
-      d.vec3f(newCamX, newCamY, newCamZ),
-      orbitOrigin,
-    );
-
-    invView = mat4.aim(
-      newCameraPos,
-      orbitOrigin,
-      d.vec3f(0, 1, 0),
-      d.mat4x4f(),
-    );
-    uploadUniforms();
-  }
-
-  canvas.addEventListener('wheel', (event: WheelEvent) => {
-    event.preventDefault();
-    const zoomSensitivity = 0.005;
-    orbitRadius = Math.max(1, orbitRadius + event.deltaY * zoomSensitivity);
-    updateCameraOrbit(0, 0);
-  });
-
-  canvas.addEventListener('mousedown', (event) => {
-    if (event.button === 0) {
-      // Left Mouse Button controls Camera Orbit.
-      isDragging = true;
-    }
-    prevX = event.clientX;
-    prevY = event.clientY;
-  });
-
-  window.addEventListener('mouseup', () => {
-    isDragging = false;
-  });
-
-  canvas.addEventListener('mousemove', (event) => {
-    const dx = event.clientX - prevX;
-    const dy = event.clientY - prevY;
-    prevX = event.clientX;
-    prevY = event.clientY;
-
-    if (isDragging) {
-      updateCameraOrbit(dx, dy);
-    }
-  });
-
-  // Mobile touch support.
-  canvas.addEventListener('touchstart', (event: TouchEvent) => {
-    event.preventDefault();
-    if (event.touches.length === 1) {
-      // Single touch controls Camera Orbit.
-      isDragging = true;
-    }
-    // Use the first touch for rotation.
-    prevX = event.touches[0].clientX;
-    prevY = event.touches[0].clientY;
-  });
-
-  canvas.addEventListener('touchmove', (event: TouchEvent) => {
-    event.preventDefault();
-    const touch = event.touches[0];
-    const dx = touch.clientX - prevX;
-    const dy = touch.clientY - prevY;
-    prevX = touch.clientX;
-    prevY = touch.clientY;
-
-    if (isDragging && event.touches.length === 1) {
-      updateCameraOrbit(dx, dy);
-    }
-  });
-
-  canvas.addEventListener('touchend', (event: TouchEvent) => {
-    event.preventDefault();
-    if (event.touches.length === 0) {
-      isDragging = false;
-    }
-  });
 
   const time = root.createUniform(d.f32);
 
@@ -360,9 +256,9 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const uv = std.sub(std.mul(input.uv, 2), 1);
 
     // Ray origin and direction
-    const ro = std.mul(uniforms.$.invView, d.vec4f(0, 0, 0, 1)).xyz;
+    const ro = std.mul(camera.pov.$.invView, d.vec4f(0, 0, 0, 1)).xyz;
     const rd = std.normalize(
-      std.mul(uniforms.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz,
+      std.mul(camera.pov.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz,
     );
 
     const march = rayMarch(ro, rd);
@@ -469,6 +365,4 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     resizeObserver.disconnect();
     root.destroy();
   });
-
-  updateCameraOrbit(0, 0);
 }
