@@ -78,14 +78,33 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     [d.vec3f],
     Shape,
   )((p) => {
-    const treePos = d.vec3f(-3, 0, 2);
-    const localP = std.sub(p, treePos);
+    // Repeat in XZ plane with 8x8 grid spacing
+    const cellSize = d.f32(8);
+    const cellId = std.floor(std.div(p.xz, cellSize));
+    const cellP = std.sub(p.xz, std.mul(cellId, cellSize));
 
-    // Trunk
+    // Add slight offset for each cell using hash-like function
+    const hash = std.fract(
+      std.sin(std.dot(cellId, d.vec2f(12.9898, 78.233))) * 43758.5453,
+    );
+    const offset = std.mul(std.sub(hash, 0.5), 2); // Range [-1, 1]
+    const offsetPos = std.add(cellP, offset);
+
+    // Center the tree in each cell
+    const localP = d.vec3f(
+      offsetPos.x - cellSize * 0.5,
+      p.y,
+      offsetPos.y - cellSize * 0.5,
+    );
+
+    // Scale up by 2x (divide position by 2, which makes the SDF 2x larger)
+    const scaledP = std.div(localP, 2);
+
+    // Trunk (scaled up 2x)
     const trunkHeight = d.f32(2);
     const trunkRadius = d.f32(0.15);
     const trunk = Shape({
-      dist: sdCylinder(localP, trunkRadius, trunkHeight),
+      dist: std.mul(sdCylinder(scaledP, trunkRadius, trunkHeight), 2), // Multiply distance by scale factor
       color: d.vec3f(0.4, 0.2, 0.1),
     });
 
@@ -93,25 +112,31 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     let tree = trunk;
 
     // Bottom layer
-    const layer1Pos = std.sub(localP, d.vec3f(0, 1.8, 0));
+    const layer1Pos = std.sub(scaledP, d.vec3f(0, 1.8, 0));
     const layer1 = Shape({
-      dist: sdCone(layer1Pos, d.vec2f(std.sin(1), std.cos(1)), 1),
+      dist: std.mul(sdCone(layer1Pos, d.vec2f(std.sin(1), std.cos(1)), 1), 2),
       color: d.vec3f(0.1, 0.4, 0.1),
     });
     tree = shapeUnion(tree, layer1);
 
     // Middle layer
-    const layer2Pos = std.sub(localP, d.vec3f(0, 2.4, 0));
+    const layer2Pos = std.sub(scaledP, d.vec3f(0, 2.4, 0));
     const layer2 = Shape({
-      dist: sdCone(layer2Pos, d.vec2f(std.sin(1.1), std.cos(1.1)), 1),
+      dist: std.mul(
+        sdCone(layer2Pos, d.vec2f(std.sin(1.1), std.cos(1.1)), 1),
+        2,
+      ),
       color: d.vec3f(0.15, 0.5, 0.15),
     });
     tree = shapeUnion(tree, layer2);
 
     // Top layer
-    const layer3Pos = std.sub(localP, d.vec3f(0, 3, 0));
+    const layer3Pos = std.sub(scaledP, d.vec3f(0, 3, 0));
     const layer3 = Shape({
-      dist: sdCone(layer3Pos, d.vec2f(std.sin(1.2), std.cos(1.2)), 1),
+      dist: std.mul(
+        sdCone(layer3Pos, d.vec2f(std.sin(1.2), std.cos(1.2)), 1),
+        2,
+      ),
       color: d.vec3f(0.2, 0.6, 0.2),
     });
     tree = shapeUnion(tree, layer3);
