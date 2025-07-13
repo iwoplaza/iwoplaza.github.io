@@ -8,7 +8,9 @@
     "preview": "astro preview",
     "astro": "astro",
     "biome": "biome",
-    "fix": "biome check --write"
+    "fix": "biome check --write",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
   },
   "dependencies": {
     "@astrojs/mdx": "^4.3.0",
@@ -27,6 +29,7 @@
     "@biomejs/biome": "^2.1.1",
     "@tailwindcss/typography": "^0.5.16",
     "@webgpu/types": "^0.1.64",
-    "unplugin-typegpu": "^0.2.0"
+    "unplugin-typegpu": "^0.2.0",
+    "vitest": "^3.2.4"
   }
 }
