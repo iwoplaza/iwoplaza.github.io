@@ -16,7 +16,7 @@ import {
   sortHits,
 } from './sdf.ts';
 
-const INSPECT = false;
+const INSPECT = true;
 const pixelation = INSPECT ? 1 : 4;
 const gameCameraOptions = {
   radius: 5,
@@ -313,8 +313,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     // AABB for the frog
     aabbs[0] = AABB({
-      min: d.vec3f(-1, 0, -1.5), // Approximate bounds
-      max: d.vec3f(1, 7, 1.5),
+      min: d.vec3f(-2, 0, -2), // Approximate bounds
+      max: d.vec3f(2, 7, 2),
     });
 
     // AABB for the floor

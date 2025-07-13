@@ -79,18 +79,8 @@ const strapRot = tgpu['~unstable'].const(
   d.mat3x3f,
   (() => {
     const mat = mat3.identity(d.mat3x3f());
-    mat3.rotateX(mat, -0.1, mat);
-    mat3.rotateY(mat, 0.05, mat);
-    return mat;
-  })(),
-);
-
-const shoulderRot = tgpu['~unstable'].const(
-  d.mat3x3f,
-  (() => {
-    const mat = mat3.identity(d.mat3x3f());
-    mat3.rotateY(mat, -0.5, mat);
-    mat3.rotateX(mat, 0.6, mat);
+    mat3.rotateX(mat, 0.1, mat);
+    mat3.rotateY(mat, -0.05, mat);
     return mat;
   })(),
 );
@@ -142,15 +132,8 @@ const getFrogBody = tgpu.fn(
 
   const torsoP = std.sub(localP, d.vec3f(0, 0.8, 0));
   let torso = sdOctahedron(opElongate(torsoP, d.vec3f(0.2, 0.3, 0)), 0.1) - 0.4;
-  const shoulderP = std.mul(
-    shoulderRot.$,
-    std.sub(localP, d.vec3f(0.7, 1.2, 0)),
-  );
-  torso = opSmoothUnion(
-    torso,
-    sdRoundedBox3d(shoulderP, d.vec3f(0.3), 0.3),
-    0.1,
-  );
+  const shoulderP = std.sub(localP, d.vec3f(0.6, 1.25, 0));
+  torso = opSmoothUnion(torso, sdSphere(shoulderP, 0.25), 0.1);
   // Neck
   const neckP = std.sub(localP, d.vec3f(0, 1.5, 0));
   torso = opSmoothUnion(torso, sdVerticalCapsule(neckP, 0.5, 0.2), 0.2);
@@ -162,8 +145,52 @@ const getFrogBody = tgpu.fn(
   return torsoShape;
 });
 
+const getArm = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
+  return {
+    dist: sdVerticalCapsule(p, 0.7, 0.15),
+    color: skinColor,
+  };
+});
+
+const getForearm = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
+  return {
+    dist: sdVerticalCapsule(p, 0.7, 0.15),
+    color: skinColor,
+  };
+});
+
+const getThigh = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
+  return {
+    dist: sdVerticalCapsule(p, 0.7, 0.2),
+    color: skinColor,
+  };
+});
+
+const getShin = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
+  return {
+    dist: sdVerticalCapsule(p, 0.8, 0.17),
+    color: skinColor,
+  };
+});
+
 export const FrogRig = d.struct({
   head: d.mat4x4f,
+  leftArm: d.mat4x4f,
+  leftForearm: d.mat4x4f,
+  leftThigh: d.mat4x4f,
+  leftShin: d.mat4x4f,
 });
 
 export function createFrog(root: TgpuRoot) {
@@ -172,6 +199,10 @@ export function createFrog(root: TgpuRoot) {
   let headYaw = 0;
   const frogRigCpu = FrogRig({
     head: mat4.identity(d.mat4x4f()),
+    leftArm: mat4.identity(d.mat4x4f()),
+    leftForearm: mat4.identity(d.mat4x4f()),
+    leftThigh: mat4.identity(d.mat4x4f()),
+    leftShin: mat4.identity(d.mat4x4f()),
   });
   const frogRig = root.createUniform(FrogRig, frogRigCpu);
   function uploadRig() {
@@ -182,15 +213,37 @@ export function createFrog(root: TgpuRoot) {
     [d.vec3f],
     Shape,
   )((p) => {
-    const headOrigin = d.vec3f(0, 4, 0);
+    const headOrigin = d.vec3f(0, 4.2, 0);
     const hp = std.sub(p, headOrigin);
     const thp = std.mul(frogRig.$.head, d.vec4f(hp, 1)).xyz;
 
-    const bodyOrigin = d.vec3f(0, 2.1, 0);
+    const bodyOrigin = d.vec3f(0, 2.3, 0);
     const bp = std.sub(p, bodyOrigin);
     const tbp = bp; // TODO: Transform
 
-    const skin = smoothShapeUnion(getFrogHead(thp), getFrogBody(tbp), 0.2);
+    const leftArmOrigin = d.vec3f(-0.7, 3.55, 0);
+    const leftArmP = std.sub(p, leftArmOrigin);
+    const leftArmTP = std.mul(frogRig.$.leftArm, d.vec4f(leftArmP, 1)).xyz;
+
+    const leftForearmTP = std.mul(
+      frogRig.$.leftForearm,
+      d.vec4f(leftArmP, 1),
+    ).xyz;
+
+    const leftThighOrigin = d.vec3f(-0.3, 2.3, 0);
+    const leftThighP = std.sub(p, leftThighOrigin);
+    const leftThighTP = std.mul(
+      frogRig.$.leftThigh,
+      d.vec4f(leftThighP, 1),
+    ).xyz;
+
+    const leftShinTP = std.mul(frogRig.$.leftShin, d.vec4f(leftThighP, 1)).xyz;
+
+    let skin = shapeUnion(getFrogHead(thp), getArm(leftArmTP));
+    skin = smoothShapeUnion(skin, getForearm(leftForearmTP), 0.1);
+    skin = smoothShapeUnion(skin, getThigh(leftThighTP), 0.1);
+    skin = smoothShapeUnion(skin, getShin(leftShinTP), 0.1);
+    skin = smoothShapeUnion(skin, getFrogBody(tbp), 0.1);
     const backpack = getBackpack(tbp);
     return shapeUnion(skin, backpack);
   });
@@ -207,6 +260,44 @@ export function createFrog(root: TgpuRoot) {
       mat4.identity(frogRigCpu.head);
       mat4.rotateX(frogRigCpu.head, -headPitch, frogRigCpu.head);
       mat4.rotateY(frogRigCpu.head, -headYaw, frogRigCpu.head);
+
+      // Left arm
+      mat4.identity(frogRigCpu.leftArm);
+      mat4.rotateZ(
+        frogRigCpu.leftArm,
+        -0.3 + Math.sin(progress) * 0.1,
+        frogRigCpu.leftArm,
+      );
+      mat4.rotateX(frogRigCpu.leftArm, Math.PI - 0.2, frogRigCpu.leftArm);
+
+      // Left forearm
+      mat4.identity(frogRigCpu.leftForearm);
+      mat4.rotateX(frogRigCpu.leftForearm, 0.4, frogRigCpu.leftForearm);
+      mat4.translate(
+        frogRigCpu.leftForearm,
+        d.vec3f(0, -0.7, 0),
+        frogRigCpu.leftForearm,
+      );
+      mat4.mul(
+        frogRigCpu.leftForearm,
+        frogRigCpu.leftArm,
+        frogRigCpu.leftForearm,
+      );
+
+      // Left thigh
+      mat4.identity(frogRigCpu.leftThigh);
+      mat4.rotateZ(frogRigCpu.leftThigh, -0.1, frogRigCpu.leftThigh);
+      mat4.rotateX(frogRigCpu.leftThigh, Math.PI + 0.2, frogRigCpu.leftThigh);
+
+      // Left shin
+      mat4.identity(frogRigCpu.leftShin);
+      mat4.rotateX(frogRigCpu.leftShin, -0.4, frogRigCpu.leftShin);
+      mat4.translate(
+        frogRigCpu.leftShin,
+        d.vec3f(0, -0.8, 0),
+        frogRigCpu.leftShin,
+      );
+      mat4.mul(frogRigCpu.leftShin, frogRigCpu.leftThigh, frogRigCpu.leftShin);
     },
     uploadRig,
   };
