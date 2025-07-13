@@ -41,8 +41,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   function resizeCanvas(canvas: HTMLCanvasElement) {
     const devicePixelRatio = window.devicePixelRatio;
-    const width = window.innerWidth * devicePixelRatio;
-    const height = window.innerHeight * devicePixelRatio;
+    const width = (window.innerWidth * devicePixelRatio) / 4;
+    const height = (window.innerHeight * devicePixelRatio) / 4;
     canvas.width = width;
     canvas.height = height;
 

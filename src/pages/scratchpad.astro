@@ -23,5 +23,9 @@ import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
       const abortCtrl = new AbortController();
       game(canvas, abortCtrl.signal);
     </script>
-  </body>
+  </body><style>
+    canvas {
+      image-rendering: pixelated;
+    }
+  </style>
 </html>
