@@ -130,7 +130,7 @@ export function createOrbitCamera(
     pov,
     updateProjection(width: number, height: number) {
       const aspect = width / height;
-      const fov = (30 / 180) * Math.PI;
+      const fov = (24 / 180) * Math.PI;
       mat4.identity(invProj);
       mat4.scale(invProj, d.vec3f(aspect, 1, 1 / Math.tan(fov)), invProj);
       uploadUniforms();

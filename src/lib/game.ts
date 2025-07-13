@@ -19,7 +19,7 @@ import {
 const INSPECT = false;
 const pixelation = INSPECT ? 1 : 4;
 const gameCameraOptions = {
-  radius: 5,
+  radius: 8,
   yaw: -Math.PI / 4,
   pitch: 0.8,
 };
@@ -87,8 +87,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const hash = std.fract(
       std.sin(std.dot(cellId, d.vec2f(12.9898, 78.233))) * 43758.5453,
     );
-    const offset = std.mul(std.sub(hash, 0.5), 2); // Range [-1, 1]
-    const offsetPos = std.add(cellP, offset);
+      const offset = std.mul(std.sub(hash, 0.5), 2);    const offsetPos = std.add(cellP, offset);
 
     // Center the tree in each cell
     const localP = d.vec3f(
@@ -97,14 +96,14 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       offsetPos.y - cellSize * 0.5,
     );
 
-    // Scale up by 2x (divide position by 2, which makes the SDF 2x larger)
+
     const scaledP = std.div(localP, 2);
 
-    // Trunk (scaled up 2x)
+    // Trunk
     const trunkHeight = d.f32(2);
     const trunkRadius = d.f32(0.15);
     const trunk = Shape({
-      dist: std.mul(sdCylinder(scaledP, trunkRadius, trunkHeight), 2), // Multiply distance by scale factor
+      dist: std.mul(sdCylinder(scaledP, trunkRadius, trunkHeight), 2),
       color: d.vec3f(0.4, 0.2, 0.1),
     });
 
@@ -348,10 +347,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       max: d.vec3f(100, 0, 100),
     });
 
-    // AABB for the tree
+    // AABB for the infinite repeating trees
     aabbs[2] = AABB({
-      min: d.vec3f(-4, 0, 1), // Approximate bounds
-      max: d.vec3f(-2, 4, 3),
+      min: d.vec3f(-100, 0, -100),
+      max: d.vec3f(100, 8, 100),
     });
 
     // Update the uniforms
