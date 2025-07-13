@@ -165,8 +165,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   const time = root.createUniform(d.f32);
 
   const MAX_STEPS = 100;
-  const MAX_DIST = 60;
-  const SURF_DIST = 0.005;
+  const MAX_DIST = 50;
+  const SURF_DIST = 0.02;
 
   const skyColor = d.vec4f(0.7, 0.8, 0.9, 1);
 
@@ -337,21 +337,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     return std.normalize(n);
   });
 
-  const getOrbitingLightPos = tgpu.fn(
-    [d.f32],
-    d.vec3f,
-  )((t) => {
-    const radius = d.f32(3);
-    const height = d.f32(6);
-    const speed = d.f32(1);
-
-    return d.vec3f(
-      std.cos(t * speed) * radius,
-      height + std.sin(t * speed) * radius,
-      4,
-    );
-  });
-
   const vertexMain = tgpu['~unstable'].vertexFn({
     in: { idx: d.builtin.vertexIndex },
     out: { pos: d.builtin.position, uv: d.vec2f },
@@ -383,14 +368,16 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const n = getNormal(p);
 
     // Lighting with orbiting light
-    const lightPos = getOrbitingLightPos(time.$);
-    const l = std.normalize(std.sub(lightPos, p));
+    const l = std.normalize(d.vec3f(0.2, 1, 1));
     const diff = std.max(std.dot(n, l), 0);
 
     // Soft shadows
     const shadowRo = p;
     const shadowRd = l;
-    const shadowDist = std.length(std.sub(lightPos, p));
+    // Max dist when looking for the shadow caster.
+    // Can be concrete with a point light, but with a directional
+    // light, it's a limit
+    const shadowDist = d.f32(32);
     const shadow = softShadow(shadowRo, shadowRd, 0.1, shadowDist, 16);
 
     // Combine lighting with shadows and color
