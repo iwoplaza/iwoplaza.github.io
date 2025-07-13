@@ -12,9 +12,23 @@ export const opSubtraction = tgpu.fn([d.f32, d.f32], d.f32)((d1, d2) =>
   std.max(-d1, d2)
 );
 
-export const opElongate = tgpu.fn([d.vec3f, d.vec3f])((p, h) =>
+export const opElongate = tgpu.fn([d.vec3f, d.vec3f], d.vec3f)((p, h) =>
   std.sub(p, std.clamp(p, std.neg(h), h))
 );
+
+export const sdOctahedron = tgpu.fn([d.vec3f, d.f32], d.f32)((p, s) => {
+  const pp = d.vec3f(std.abs(p.x), std.abs(p.y), std.abs(p.z));
+  const m = pp.x + pp.y + pp.z - s;
+  
+  let q = pp;
+  if (3.0 * pp.x < m) q = pp.xyz;
+  else if (3.0 * pp.y < m) q = pp.yzx;
+  else if (3.0 * pp.z < m) q = pp.zxy;
+  else return m * 0.57735027;
+  
+  const k = std.clamp(0.5 * (q.z - q.y + s), 0.0, s);
+  return std.length(d.vec3f(q.x, q.y - s + k, q.z - k));
+});
 
 // float opSmoothSubtraction( float d1, float d2, float k )
 // {

@@ -172,14 +172,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     return std.abs(fuv.x + fuv.y) % 2;
   });
 
-  const frogRigCpu = FrogRig({
-    head: mat4.identity(d.mat4x4f()),
-  });
-  const frogRig = root.createUniform(FrogRig, frogRigCpu);
-  function updateFrogRig() {
-    frogRig.write(frogRigCpu);
-  }
-
   const getPineTree = tgpu.fn([d.vec3f], Shape)((p) => {
     const treePos = d.vec3f(-3, 0, 2);
     const localP = std.sub(p, treePos);
@@ -237,7 +229,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     });
 
     const sceneWithTree = shapeUnion(frogShape, tree);
-    return shapeUnion(sceneWithTree, floor);
+    // return shapeUnion(sceneWithTree, floor);
+    return sceneWithTree;
   });
 
   const rayMarch = tgpu.fn([d.vec3f, d.vec3f], Shape)((ro, rd) => {
@@ -373,9 +366,16 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   });
 
   let animationFrame: number;
+  let lastTime: undefined | number;
   function run(timestamp: number) {
+    if (lastTime === undefined) {
+      lastTime = timestamp;
+    }
+    const dt = (timestamp - lastTime) * 0.001;
+    lastTime = timestamp;
     time.write(timestamp / 1000 % 1000);
-    updateFrogRig();
+    frog.update(dt);
+    frog.uploadRig();
 
     renderPipeline
       .withColorAttachment({
