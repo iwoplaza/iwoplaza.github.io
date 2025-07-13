@@ -87,7 +87,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const hash = std.fract(
       std.sin(std.dot(cellId, d.vec2f(12.9898, 78.233))) * 43758.5453,
     );
-      const offset = std.mul(std.sub(hash, 0.5), 2);    const offsetPos = std.add(cellP, offset);
+    const offset = std.mul(std.sub(hash, 0.5), 2);
+    const offsetPos = std.add(cellP, offset);
 
     // Center the tree in each cell
     const localP = d.vec3f(
@@ -95,7 +96,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       p.y,
       offsetPos.y - cellSize * 0.5,
     );
-
 
     const scaledP = std.div(localP, 4);
 
