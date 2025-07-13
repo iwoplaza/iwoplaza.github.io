@@ -1,13 +1,24 @@
-import { opSmoothUnion, opUnion, sdRoundedBox3d, sdSphere } from "@typegpu/sdf";
-import tgpu, { type TgpuRoot } from "typegpu";
-import * as d from "typegpu/data";
-import * as std from "typegpu/std";
-import { mat3, mat4 } from "wgpu-matrix";
-import { opSubtraction, sdCappedTorus, Shape, shapeUnion, sdOctahedron, opElongate, smoothShapeUnion } from "./sdf.ts";
+import { opSmoothUnion, opUnion, sdRoundedBox3d, sdSphere } from '@typegpu/sdf';
+import tgpu, { type TgpuRoot } from 'typegpu';
+import * as d from 'typegpu/data';
+import * as std from 'typegpu/std';
+import { mat3, mat4 } from 'wgpu-matrix';
+import {
+  opElongate,
+  opSubtraction,
+  Shape,
+  sdCappedTorus,
+  sdOctahedron,
+  shapeUnion,
+  smoothShapeUnion,
+} from './sdf.ts';
 
 const skinColor = d.vec3f(0.3, 0.8, 0.4);
 
-const getFrogHead = tgpu.fn([d.vec3f], Shape)((p) => {
+const getFrogHead = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
   const center = d.vec3f(0, 0.6, 0);
   const localP = std.sub(p, center);
   // Symmetric along the X-axis
@@ -59,32 +70,44 @@ const getFrogHead = tgpu.fn([d.vec3f], Shape)((p) => {
   return shapeUnion(headShape, eyeShape);
 });
 
-const strapRot = tgpu["~unstable"].const(d.mat3x3f, (() => {
-  const mat = mat3.identity(d.mat3x3f());
-  mat3.rotateX(mat, -0.1, mat);
-  mat3.rotateY(mat, 0.05, mat);
-  return mat;
-})());
+const strapRot = tgpu['~unstable'].const(
+  d.mat3x3f,
+  (() => {
+    const mat = mat3.identity(d.mat3x3f());
+    mat3.rotateX(mat, -0.1, mat);
+    mat3.rotateY(mat, 0.05, mat);
+    return mat;
+  })(),
+);
 
-const shoulderRot = tgpu["~unstable"].const(d.mat3x3f, (() => {
-  const mat = mat3.identity(d.mat3x3f());
-  mat3.rotateY(mat, -0.5, mat);
-  mat3.rotateX(mat, 0.6, mat);
-  return mat;
-})());
+const shoulderRot = tgpu['~unstable'].const(
+  d.mat3x3f,
+  (() => {
+    const mat = mat3.identity(d.mat3x3f());
+    mat3.rotateY(mat, -0.5, mat);
+    mat3.rotateX(mat, 0.6, mat);
+    return mat;
+  })(),
+);
 
-const getBackpack = tgpu.fn([d.vec3f], Shape)((p) => {
+const getBackpack = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
   const center = d.vec3f(0, 0.8, 0);
   const localP = std.sub(p, center);
   // Symmetric along the X-axis
   localP.x = std.abs(localP.x);
-  
+
   const backpackP = std.sub(localP, d.vec3f(0, 0, -0.8));
   let backpack = sdRoundedBox3d(backpackP, d.vec3f(0.7, 0.8, 0.4), 0.2);
 
   // Strap
   const strapAngle = d.f32(0.8);
-  let strapP = std.sub(std.mul(localP.yzx, d.vec3f(1, -1, 1)), d.vec3f(0, 0.1, 0.5));
+  let strapP = std.sub(
+    std.mul(localP.yzx, d.vec3f(1, -1, 1)),
+    d.vec3f(0, 0.1, 0.5),
+  );
   strapP = std.mul(strapRot.$, strapP);
   strapP = opElongate(strapP, d.vec3f(0.4, 0.1, 0.07));
   backpack = opUnion(
@@ -103,16 +126,26 @@ const getBackpack = tgpu.fn([d.vec3f], Shape)((p) => {
   };
 });
 
-const getFrogBody = tgpu.fn([d.vec3f], Shape)((p) => {
+const getFrogBody = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
   const center = d.vec3f();
   const localP = std.sub(p, center);
   // Symmetric along the X-axis
   localP.x = std.abs(localP.x);
-  
+
   const torsoP = std.sub(localP, d.vec3f(0, 0.8, 0));
   let torso = sdOctahedron(opElongate(torsoP, d.vec3f(0.2, 0.5, 0)), 0.1) - 0.4;
-  const shoulderP = std.mul(shoulderRot.$, std.sub(localP, d.vec3f(0.7, 1.3, 0)));
-  torso = opSmoothUnion(torso, sdRoundedBox3d(shoulderP, d.vec3f(0.3), 0.3), 0.1);
+  const shoulderP = std.mul(
+    shoulderRot.$,
+    std.sub(localP, d.vec3f(0.7, 1.3, 0)),
+  );
+  torso = opSmoothUnion(
+    torso,
+    sdRoundedBox3d(shoulderP, d.vec3f(0.3), 0.3),
+    0.1,
+  );
   const torsoShape = Shape({
     dist: torso,
     color: skinColor,
@@ -137,7 +170,10 @@ export function createFrog(root: TgpuRoot) {
     frogRig.write(frogRigCpu);
   }
 
-  const getFrog = tgpu.fn([d.vec3f], Shape)((p) => {
+  const getFrog = tgpu.fn(
+    [d.vec3f],
+    Shape,
+  )((p) => {
     const headOrigin = d.vec3f(0, 4, 0);
     const hp = std.sub(p, headOrigin);
     const thp = std.mul(frogRig.$.head, d.vec4f(hp, 1)).xyz;
@@ -146,7 +182,7 @@ export function createFrog(root: TgpuRoot) {
     const bp = std.sub(p, bodyOrigin);
     const tbp = bp; // TODO: Transform
 
-    let skin = smoothShapeUnion(getFrogHead(thp), getFrogBody(tbp), 0.2);
+    const skin = smoothShapeUnion(getFrogHead(thp), getFrogBody(tbp), 0.2);
     const backpack = getBackpack(tbp);
     return shapeUnion(skin, backpack);
   });

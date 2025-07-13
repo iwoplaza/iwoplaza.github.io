@@ -1,17 +1,20 @@
-import tgpu from "typegpu";
-import * as d from "typegpu/data";
-import * as std from "typegpu/std";
-import { mat4 } from "wgpu-matrix";
+import { sdPlane } from '@typegpu/sdf';
+import tgpu from 'typegpu';
+import * as d from 'typegpu/data';
+import * as std from 'typegpu/std';
+import { mat4 } from 'wgpu-matrix';
+import { createFrog } from './frog.ts';
 import {
-  opSmoothUnion,
-  opUnion,
-  sdBoxFrame3d,
-  sdPlane,
-  sdRoundedBox3d,
-  sdSphere,
-} from "@typegpu/sdf";
-import { createFrog, FrogRig } from "./frog.ts";
-import { sdCone, sdCylinder, Shape, shapeUnion, smoothShapeUnion } from "./sdf.ts";
+  AABB,
+  AABBHit,
+  intersectAABB,
+  MAX_AABBS,
+  Shape,
+  sdCone,
+  sdCylinder,
+  shapeUnion,
+  sortHits,
+} from './sdf.ts';
 
 export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   const root = await tgpu.init();
@@ -24,7 +27,11 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     }),
   );
 
-  let invProj = mat4.identity(d.mat4x4f());
+  // Create uniform for AABBs
+  const sceneAABBs = root.createUniform(d.arrayOf(AABB, MAX_AABBS));
+  const numAABBs = root.createUniform(d.u32);
+
+  const invProj = mat4.identity(d.mat4x4f());
   let invView = mat4.identity(d.mat4x4f());
 
   function uploadUniforms() {
@@ -95,14 +102,14 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     uploadUniforms();
   }
 
-  canvas.addEventListener("wheel", (event: WheelEvent) => {
+  canvas.addEventListener('wheel', (event: WheelEvent) => {
     event.preventDefault();
     const zoomSensitivity = 0.005;
     orbitRadius = Math.max(1, orbitRadius + event.deltaY * zoomSensitivity);
     updateCameraOrbit(0, 0);
   });
 
-  canvas.addEventListener("mousedown", (event) => {
+  canvas.addEventListener('mousedown', (event) => {
     if (event.button === 0) {
       // Left Mouse Button controls Camera Orbit.
       isDragging = true;
@@ -111,11 +118,11 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     prevY = event.clientY;
   });
 
-  window.addEventListener("mouseup", () => {
+  window.addEventListener('mouseup', () => {
     isDragging = false;
   });
 
-  canvas.addEventListener("mousemove", (event) => {
+  canvas.addEventListener('mousemove', (event) => {
     const dx = event.clientX - prevX;
     const dy = event.clientY - prevY;
     prevX = event.clientX;
@@ -127,7 +134,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   });
 
   // Mobile touch support.
-  canvas.addEventListener("touchstart", (event: TouchEvent) => {
+  canvas.addEventListener('touchstart', (event: TouchEvent) => {
     event.preventDefault();
     if (event.touches.length === 1) {
       // Single touch controls Camera Orbit.
@@ -138,7 +145,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     prevY = event.touches[0].clientY;
   });
 
-  canvas.addEventListener("touchmove", (event: TouchEvent) => {
+  canvas.addEventListener('touchmove', (event: TouchEvent) => {
     event.preventDefault();
     const touch = event.touches[0];
     const dx = touch.clientX - prevX;
@@ -151,7 +158,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     }
   });
 
-  canvas.addEventListener("touchend", (event: TouchEvent) => {
+  canvas.addEventListener('touchend', (event: TouchEvent) => {
     event.preventDefault();
     if (event.touches.length === 0) {
       isDragging = false;
@@ -166,13 +173,18 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const skyColor = d.vec4f(0.7, 0.8, 0.9, 1);
 
-
-  const checkerBoard = tgpu.fn([d.vec2f], d.f32)((uv) => {
+  const checkerBoard = tgpu.fn(
+    [d.vec2f],
+    d.f32,
+  )((uv) => {
     const fuv = std.floor(uv);
     return std.abs(fuv.x + fuv.y) % 2;
   });
 
-  const getPineTree = tgpu.fn([d.vec3f], Shape)((p) => {
+  const getPineTree = tgpu.fn(
+    [d.vec3f],
+    Shape,
+  )((p) => {
     const treePos = d.vec3f(-3, 0, 2);
     const localP = std.sub(p, treePos);
 
@@ -216,16 +228,15 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const frog = createFrog(root);
 
-  const getSceneDist = tgpu.fn([d.vec3f], Shape)((p) => {
+  const getSceneDist = tgpu.fn(
+    [d.vec3f],
+    Shape,
+  )((p) => {
     const frogShape = frog.getFrog(p);
     const tree = getPineTree(p);
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
-      color: std.mix(
-        d.vec3f(1),
-        d.vec3f(0.2),
-        checkerBoard(std.mul(p.xz, 2)),
-      ),
+      color: std.mix(d.vec3f(1), d.vec3f(0.2), checkerBoard(std.mul(p.xz, 2))),
     });
 
     const sceneWithTree = shapeUnion(frogShape, tree);
@@ -233,25 +244,65 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     return sceneWithTree;
   });
 
-  const rayMarch = tgpu.fn([d.vec3f, d.vec3f], Shape)((ro, rd) => {
+  const createArray = tgpu.fn([], d.arrayOf(AABBHit, MAX_AABBS))`() {
+    return array<AABBHit, MAX_AABBS>();
+  }`.$uses({ AABBHit, MAX_AABBS });
+
+  const rayMarch = tgpu.fn(
+    [d.vec3f, d.vec3f],
+    Shape,
+  )((ro, rd) => {
     let dO = d.f32(0);
     const result = Shape({
       dist: d.f32(MAX_DIST),
       color: d.vec3f(0, 0, 0),
     });
 
-    for (let i = 0; i < MAX_STEPS; i++) {
-      const p = std.add(ro, std.mul(rd, dO));
-      const scene = getSceneDist(p);
-      dO += scene.dist;
+    // Get all AABB intersections
+    let step = d.u32(0);
+    const hits = createArray();
+    let numHits = d.u32(0);
 
-      if (dO > MAX_DIST || scene.dist < SURF_DIST) {
-        result.dist = dO;
-        result.color = scene.color;
-        break;
+    for (let i = d.u32(0); i < std.min(numAABBs.$, MAX_AABBS); i++) {
+      const hit = intersectAABB(ro, rd, sceneAABBs.$[i]);
+      if (hit.enter <= hit.exit && hit.exit >= 0) {
+        // Valid intersection
+        hits[numHits] = hit;
+        numHits++;
       }
     }
 
+    // Sort hits by enter distance
+    sortHits(hits, d.i32(numHits));
+
+    // March through each AABB
+    for (let hitIndex = d.u32(0); hitIndex < numHits; hitIndex++) {
+      const hit = hits[hitIndex];
+
+      // Start marching from max (current distance, enter point)
+      dO = std.max(dO, hit.enter);
+
+      // March until we exit this AABB
+      while (dO < hit.exit && dO < MAX_DIST) {
+        const p = std.add(ro, std.mul(rd, dO));
+        const scene = getSceneDist(p);
+
+        if (scene.dist < SURF_DIST) {
+          result.dist = dO;
+          result.color = scene.color;
+          return result;
+        }
+
+        dO += scene.dist;
+        step++;
+        if (step > MAX_STEPS) {
+          result.dist = MAX_DIST;
+          return result;
+        }
+      }
+    }
+
+    result.dist = MAX_DIST;
     return result;
   });
 
@@ -266,14 +317,17 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       if (t >= maxT) break;
       const h = getSceneDist(std.add(ro, std.mul(rd, t))).dist;
       if (h < 0.001) return 0;
-      res = std.min(res, k * h / t);
+      res = std.min(res, (k * h) / t);
       t += std.max(h, 0.001);
     }
 
     return res;
   });
 
-  const getNormal = tgpu.fn([d.vec3f], d.vec3f)((p) => {
+  const getNormal = tgpu.fn(
+    [d.vec3f],
+    d.vec3f,
+  )((p) => {
     const dist = getSceneDist(p).dist;
     const e = 0.01;
 
@@ -286,7 +340,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     return std.normalize(n);
   });
 
-  const getOrbitingLightPos = tgpu.fn([d.f32], d.vec3f)((t) => {
+  const getOrbitingLightPos = tgpu.fn(
+    [d.f32],
+    d.vec3f,
+  )((t) => {
     const radius = d.f32(3);
     const height = d.f32(6);
     const speed = d.f32(1);
@@ -298,7 +355,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     );
   });
 
-  const vertexMain = tgpu["~unstable"].vertexFn({
+  const vertexMain = tgpu['~unstable'].vertexFn({
     in: { idx: d.builtin.vertexIndex },
     out: { pos: d.builtin.position, uv: d.vec2f },
   })(({ idx }) => {
@@ -311,7 +368,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     };
   });
 
-  const fragmentMain = tgpu["~unstable"].fragmentFn({
+  const fragmentMain = tgpu['~unstable'].fragmentFn({
     in: { uv: d.vec2f },
     out: d.vec4f,
   })((input) => {
@@ -352,18 +409,44 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     return std.mix(d.vec4f(finalColor, 1), skyColor, fog);
   });
 
-  const renderPipeline = root["~unstable"]
+  const renderPipeline = root['~unstable']
     .withVertex(vertexMain, {})
     .withFragment(fragmentMain, { format: presentationFormat })
     .createPipeline();
 
-  const context = canvas.getContext("webgpu") as GPUCanvasContext;
+  const context = canvas.getContext('webgpu') as GPUCanvasContext;
 
   context.configure({
     device: root.device,
     format: presentationFormat,
-    alphaMode: "premultiplied",
+    alphaMode: 'premultiplied',
   });
+
+  // Function to update scene AABBs
+  function updateSceneAABBs() {
+    const aabbs = Array.from({ length: MAX_AABBS }, () =>
+      AABB({
+        min: d.vec3f(),
+        max: d.vec3f(),
+      }),
+    );
+
+    // AABB for the frog
+    aabbs[0] = AABB({
+      min: d.vec3f(-1, 3, -1), // Approximate bounds
+      max: d.vec3f(1, 5, 1),
+    });
+
+    // AABB for the tree
+    aabbs[1] = AABB({
+      min: d.vec3f(-4, 0, 1), // Approximate bounds
+      max: d.vec3f(-2, 4, 3),
+    });
+
+    // Update the uniforms
+    sceneAABBs.write(aabbs);
+    numAABBs.write(2);
+  }
 
   let animationFrame: number;
   let lastTime: undefined | number;
@@ -373,16 +456,17 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     }
     const dt = (timestamp - lastTime) * 0.001;
     lastTime = timestamp;
-    time.write(timestamp / 1000 % 1000);
+    time.write((timestamp / 1000) % 1000);
     frog.update(dt);
     frog.uploadRig();
+    updateSceneAABBs();
 
     renderPipeline
       .withColorAttachment({
         view: context.getCurrentTexture().createView(),
         clearValue: [1, 1, 1, 1],
-        loadOp: "clear",
-        storeOp: "store",
+        loadOp: 'clear',
+        storeOp: 'store',
       })
       .draw(3);
 
@@ -390,7 +474,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   }
   requestAnimationFrame(run);
 
-  signal.addEventListener("abort", () => {
+  signal.addEventListener('abort', () => {
     cancelAnimationFrame(animationFrame);
     resizeObserver.disconnect();
     root.destroy();
