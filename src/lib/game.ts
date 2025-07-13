@@ -2,20 +2,61 @@ import tgpu from "typegpu";
 import * as d from "typegpu/data";
 import * as std from "typegpu/std";
 import { mat4 } from "wgpu-matrix";
-import { sdBoxFrame3d, sdPlane, sdSphere } from "@typegpu/sdf";
+import {
+  opSmoothUnion,
+  opUnion,
+  sdBoxFrame3d,
+  sdPlane,
+  sdRoundedBox3d,
+  sdSphere,
+} from "@typegpu/sdf";
+
+const opSubtraction = tgpu.fn([d.f32, d.f32], d.f32)((d1, d2) =>
+  std.max(-d1, d2)
+);
+
+const opElongate = tgpu.fn([d.vec3f, d.vec3f])((p, h) =>
+  std.sub(p, std.clamp(p, std.neg(h), h))
+);
+
+// float opSmoothSubtraction( float d1, float d2, float k )
+// {
+//     float h = clamp( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
+//     return mix( d2, -d1, h ) + k*h*(1.0-h);
+// }
 
 const sdCylinder = tgpu.fn([d.vec3f, d.f32, d.f32], d.f32)((p, r, h) => {
   const dd = d.vec2f(std.length(p.xz), p.y);
-  const q = d.vec2f(dd.x - r, std.abs(dd.y) - h/2);
+  const q = d.vec2f(dd.x - r, std.abs(dd.y) - h / 2);
   return std.min(std.max(q.x, q.y), 0) + std.length(std.max(q, d.vec2f()));
 });
+
+const sdRoundedCylinder = tgpu.fn([d.vec3f, d.f32, d.f32, d.f32], d.f32)(
+  (p, ra, rb, h) => {
+    const dd = d.vec2f(std.length(p.xz) - 2.0 * ra + rb, std.abs(p.y) - h);
+    return std.min(std.max(dd.x, dd.y), 0.0) +
+      std.length(std.max(dd, d.vec2f())) - rb;
+  },
+);
+
+const sdCappedTorus = tgpu.fn([d.vec3f, d.vec2f, d.f32, d.f32], d.f32)(
+  (p, sc, ra, rb) => {
+    const px = d.vec3f(std.abs(p.x), p.y, p.z);
+    const k = std.select(
+      std.dot(px.xy, sc),
+      std.length(px.xy),
+      sc.y * px.x > sc.x * px.y,
+    );
+    return std.sqrt(std.dot(p, p) + ra * ra - 2.0 * ra * k) - rb;
+  },
+);
 
 /**
  * c is the sin/cos of the angle, h is height
  */
 const sdCone = tgpu.fn([d.vec3f, d.vec2f, d.f32], d.f32)((p, c, h) => {
   const q = std.length(p.xz);
-  return std.max(std.dot(c.xy, d.vec2f(q, p.y)), -h-p.y);
+  return std.max(std.dot(c.xy, d.vec2f(q, p.y)), -h - p.y);
 });
 
 const smoothstep = tgpu.fn([d.f32, d.f32, d.f32], d.f32)`(a, b, t) {
@@ -51,7 +92,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const aspect = canvas.width / canvas.height;
     const fov = (50 / 180) * Math.PI;
     mat4.identity(invProj);
-    mat4.scale(invProj, d.vec3f(aspect, 1, 1/Math.tan(fov)), invProj);
+    mat4.scale(invProj, d.vec3f(aspect, 1, 1 / Math.tan(fov)), invProj);
     uploadUniforms();
   }
 
@@ -68,7 +109,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   // Yaw and pitch angles facing the origin.
   let orbitRadius = 2;
   let orbitYaw = 0;
-  let orbitPitch = 0.4;
+  let orbitPitch = 0;
 
   function updateCameraOrbit(dx: number, dy: number) {
     console.log({
@@ -90,9 +131,17 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const newCamX = logOrbitRadius * -Math.sin(orbitYaw) * Math.cos(orbitPitch);
     const newCamY = logOrbitRadius * Math.sin(orbitPitch);
     const newCamZ = logOrbitRadius * Math.cos(orbitYaw) * Math.cos(orbitPitch);
-    const newCameraPos = std.add(d.vec3f(newCamX, newCamY, newCamZ), orbitOrigin);
+    const newCameraPos = std.add(
+      d.vec3f(newCamX, newCamY, newCamZ),
+      orbitOrigin,
+    );
 
-    invView = mat4.aim(newCameraPos, orbitOrigin, d.vec3f(0, 1, 0), d.mat4x4f());
+    invView = mat4.aim(
+      newCameraPos,
+      orbitOrigin,
+      d.vec3f(0, 1, 0),
+      d.mat4x4f(),
+    );
     uploadUniforms();
   }
 
@@ -197,10 +246,65 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     dist: std.min(a.dist, b.dist),
   }));
 
+  const getFrog = tgpu.fn([d.vec3f], Shape)((p) => {
+    const center = d.vec3f(0, 2, 0);
+    const localP = std.sub(p, center);
+    // Symmetric along the X-axis
+    localP.x = std.abs(localP.x);
+    const skinColor = d.vec3f(0.3, 0.8, 0.4);
+    // let head = sdRoundedCylinder(localP.xzy, 0.5, 0.5, 0);
+    let head = sdRoundedBox3d(localP, d.vec3f(0.8, 0.7, 0.6), 0.6);
+    // head = opSmoothUnion(head, sdCappedTorus(localP, d.vec2f(1), 0, 1), 0.1);
+    const frownAngle = 2.95;
+    const frownP = d.vec3f(localP.x, -localP.y - 2.6, localP.z - 0.8);
+    const lipP = std.add(frownP, d.vec3f(0, 0, 0.2));
+    // Lip
+    head = opSmoothUnion(
+      head,
+      sdCappedTorus(
+        lipP,
+        d.vec2f(std.sin(frownAngle), std.cos(frownAngle)),
+        2.5,
+        0.2,
+      ),
+      0.3,
+    );
+    // Frown
+    head = opSubtraction(
+      sdCappedTorus(
+        frownP,
+        d.vec2f(std.sin(frownAngle), std.cos(frownAngle)),
+        2.5,
+        0.07,
+      ),
+      head,
+    );
+    // EyeBulge
+    const eyeBulgeP = std.add(localP, d.vec3f(-0.5, -0.35, -0.2));
+    head = opSmoothUnion(head, sdSphere(eyeBulgeP, 0.4), 0.2);
+    // Cheek
+    const cheekP = std.add(localP, d.vec3f(-0.5, 0.2, -0.2));
+    head = opSmoothUnion(head, sdSphere(cheekP, 0.4), 0.2);
+    // ...
+
+    const headShape = Shape({
+      dist: head,
+      color: skinColor,
+    });
+
+    const eyeP = std.add(localP, d.vec3f(-0.45, -0.3, -0.5));
+    const eyeShape = Shape({
+      dist: sdSphere(eyeP, 0.2),
+      color: d.vec3f(),
+    });
+
+    return shapeUnion(headShape, eyeShape);
+  });
+
   const getPineTree = tgpu.fn([d.vec3f], Shape)((p) => {
     const treePos = d.vec3f(-3, 0, 2);
     const localP = std.sub(p, treePos);
-    
+
     // Trunk
     const trunkHeight = d.f32(2);
     const trunkRadius = d.f32(0.15);
@@ -208,10 +312,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       dist: sdCylinder(localP, trunkRadius, trunkHeight),
       color: d.vec3f(0.4, 0.2, 0.1),
     });
-    
+
     // Pine tree layers (cones stacked on top of each other)
     let tree = trunk;
-    
+
     // Bottom layer
     const layer1Pos = std.sub(localP, d.vec3f(0, 1.8, 0));
     const layer1 = Shape({
@@ -219,7 +323,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       color: d.vec3f(0.1, 0.4, 0.1),
     });
     tree = shapeUnion(tree, layer1);
-    
+
     // Middle layer
     const layer2Pos = std.sub(localP, d.vec3f(0, 2.4, 0));
     const layer2 = Shape({
@@ -227,7 +331,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       color: d.vec3f(0.15, 0.5, 0.15),
     });
     tree = shapeUnion(tree, layer2);
-    
+
     // Top layer
     const layer3Pos = std.sub(localP, d.vec3f(0, 3, 0));
     const layer3 = Shape({
@@ -235,7 +339,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       color: d.vec3f(0.2, 0.6, 0.2),
     });
     tree = shapeUnion(tree, layer3);
-    
+
     return tree;
   });
 
@@ -282,7 +386,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   });
 
   const getSceneDist = tgpu.fn([d.vec3f], Shape)((p) => {
-    const shape = getMorphingShape(p, time.$);
+    const frog = getFrog(p);
     const tree = getPineTree(p);
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
@@ -293,7 +397,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       ),
     });
 
-    const sceneWithTree = shapeUnion(shape, tree);
+    const sceneWithTree = shapeUnion(frog, tree);
     return shapeUnion(sceneWithTree, floor);
   });
 
@@ -383,7 +487,9 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     // Ray origin and direction
     const ro = std.mul(uniforms.$.invView, d.vec4f(0, 0, 0, 1)).xyz;
-    const rd = std.normalize(std.mul(uniforms.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz);
+    const rd = std.normalize(
+      std.mul(uniforms.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz,
+    );
 
     const march = rayMarch(ro, rd);
 
