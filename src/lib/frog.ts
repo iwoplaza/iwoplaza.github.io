@@ -13,7 +13,11 @@ import {
   smoothShapeUnion,
 } from './sdf.ts';
 
-const skinColor = d.vec3f(0.3, 0.8, 0.4);
+// Palette
+// const skinColor = d.vec3f(0.3, 0.8, 0.4);
+// const backpackColor = d.vec3f(0.4, 0.4, 0.1);
+const skinColor = d.vec3f(0.8, 0.6, 0.2);
+const backpackColor = d.vec3f(0.2, 0.4, 0.6);
 
 const getFrogHead = tgpu.fn(
   [d.vec3f],
@@ -122,7 +126,7 @@ const getBackpack = tgpu.fn(
 
   return {
     dist: backpack,
-    color: d.vec3f(0.4, 0.4, 0.1),
+    color: backpackColor,
   };
 });
 

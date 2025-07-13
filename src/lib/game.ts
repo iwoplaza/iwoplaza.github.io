@@ -62,7 +62,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   let isDragging = false;
   let prevX = 0;
   let prevY = 0;
-  const orbitOrigin = d.vec3f(0, 2, 0);
+  const orbitOrigin = d.vec3f(0, 4, 0);
   // Yaw and pitch angles facing the origin.
   let orbitRadius = 2;
   let orbitYaw = 0;
@@ -162,7 +162,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   const time = root.createUniform(d.f32);
 
   const MAX_STEPS = 100;
-  const MAX_DIST = 30;
+  const MAX_DIST = 60;
   const SURF_DIST = 0.005;
 
   const skyColor = d.vec4f(0.7, 0.8, 0.9, 1);
@@ -234,8 +234,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     });
 
     const sceneWithTree = shapeUnion(frogShape, tree);
-    // return shapeUnion(sceneWithTree, floor);
-    return sceneWithTree;
+    return shapeUnion(sceneWithTree, floor);
+    // return sceneWithTree;
   });
 
   const createArray = tgpu.fn([], d.arrayOf(AABBHit, MAX_AABBS))`() {
@@ -376,8 +376,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     const march = rayMarch(ro, rd);
 
-    const fog = std.pow(std.min(march.dist / MAX_DIST, 1), 0.7);
-
     const p = std.add(ro, std.mul(rd, march.dist));
     const n = getNormal(p);
 
@@ -387,21 +385,19 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const diff = std.max(std.dot(n, l), 0);
 
     // Soft shadows
-    // const shadowRo = p;
-    // const shadowRd = l;
-    // const shadowDist = std.length(std.sub(lightPos, p));
-    const shadow = d.f32(1);
-    // const shadow = softShadow(shadowRo, shadowRd, 0.1, shadowDist, 16);
+    const shadowRo = p;
+    const shadowRd = l;
+    const shadowDist = std.length(std.sub(lightPos, p));
+    const shadow = softShadow(shadowRo, shadowRd, 0.1, shadowDist, 16);
 
     // Combine lighting with shadows and color
-    const litColor = std.mul(march.color, diff);
-    const finalColor = std.mix(
-      std.mul(litColor, 0.5), // Shadow color
-      litColor, // Lit color
-      shadow,
-    );
+    const litColor = std.mul(march.color, 0.3 + std.min(diff, shadow) * 0.7);
 
-    return std.mix(d.vec4f(finalColor, 1), skyColor, fog);
+    if (march.dist >= MAX_DIST) {
+      return skyColor;
+    }
+
+    return d.vec4f(litColor, 1);
   });
 
   const renderPipeline = root['~unstable']
@@ -432,15 +428,21 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       max: d.vec3f(1, 7, 1.5),
     });
 
-    // AABB for the tree
+    // AABB for the floor
     aabbs[1] = AABB({
+      min: d.vec3f(-10, -1, -10), // Approximate bounds
+      max: d.vec3f(10, 0, 10),
+    });
+
+    // AABB for the tree
+    aabbs[2] = AABB({
       min: d.vec3f(-4, 0, 1), // Approximate bounds
       max: d.vec3f(-2, 4, 3),
     });
 
     // Update the uniforms
     sceneAABBs.write(aabbs);
-    numAABBs.write(2);
+    numAABBs.write(3);
   }
 
   let animationFrame: number;
