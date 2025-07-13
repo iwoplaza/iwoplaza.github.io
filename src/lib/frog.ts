@@ -9,9 +9,9 @@ import {
   Shape,
   sdCappedTorus,
   sdOctahedron,
+  sdVerticalCapsule,
   shapeUnion,
   smoothShapeUnion,
-  sdVerticalCapsule,
 } from './sdf.ts';
 
 // Palette

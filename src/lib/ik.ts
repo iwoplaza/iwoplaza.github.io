@@ -1,21 +1,14 @@
-import { type v3f, vec3f } from 'typegpu/data';
+import { type v2f, type v3f, vec2f, vec3f } from 'typegpu/data';
 import { add, mul, normalize, sub } from 'typegpu/std';
 
 /**
  * Origin of the chain is assumed to be (0, 0, 0)
+ * Pull direction is assumed to be (0, 0, 1)
  * @param chain
  * @param target
- * @param pull
- * @param forward
- * @param right
  */
-export function solveIK(
-  chain: readonly number[],
-  target: v3f,
-  pull: v3f,
-  forward: v3f,
-  right: v3f,
-) {
+export function solveIK(chain: readonly number[], target: v3f) {
+  const pull = vec3f(0, 0, 1);
   const chainPoints: v3f[] = [vec3f()];
   const dir = normalize(target);
   let acc = vec3f();
@@ -52,4 +45,20 @@ export function solveIK(
   }
 
   return chainPoints;
+}
+
+export function extractAnglesBetweenPoints(points: readonly v3f[]): v2f[] {
+  const angles: v2f[] = [];
+
+  for (let i = 0; i < points.length - 1; ++i) {
+    const curr = points[i];
+    const next = points[i + 1];
+    const dir = sub(next, curr);
+
+    const pitch = Math.asin(dir.z);
+    const roll = Math.asin(dir.x);
+    angles.push(vec2f(pitch, roll));
+  }
+
+  return angles;
 }
