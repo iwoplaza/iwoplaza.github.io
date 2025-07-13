@@ -69,12 +69,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   let orbitPitch = 0;
 
   function updateCameraOrbit(dx: number, dy: number) {
-    console.log({
-      orbitRadius,
-      orbitYaw,
-      orbitPitch,
-    });
-
     const orbitSensitivity = 0.005;
     orbitYaw += -dx * orbitSensitivity;
     orbitPitch += dy * orbitSensitivity;
@@ -167,9 +161,9 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const time = root.createUniform(d.f32);
 
-  const MAX_STEPS = 1000;
+  const MAX_STEPS = 100;
   const MAX_DIST = 30;
-  const SURF_DIST = 0.001;
+  const SURF_DIST = 0.005;
 
   const skyColor = d.vec4f(0.7, 0.8, 0.9, 1);
 
@@ -393,10 +387,11 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const diff = std.max(std.dot(n, l), 0);
 
     // Soft shadows
-    const shadowRo = p;
-    const shadowRd = l;
-    const shadowDist = std.length(std.sub(lightPos, p));
-    const shadow = softShadow(shadowRo, shadowRd, 0.1, shadowDist, 16);
+    // const shadowRo = p;
+    // const shadowRd = l;
+    // const shadowDist = std.length(std.sub(lightPos, p));
+    const shadow = d.f32(1);
+    // const shadow = softShadow(shadowRo, shadowRd, 0.1, shadowDist, 16);
 
     // Combine lighting with shadows and color
     const litColor = std.mul(march.color, diff);
@@ -433,8 +428,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     // AABB for the frog
     aabbs[0] = AABB({
-      min: d.vec3f(-1, 3, -1), // Approximate bounds
-      max: d.vec3f(1, 5, 1),
+      min: d.vec3f(-1, 0, -1.5), // Approximate bounds
+      max: d.vec3f(1, 7, 1.5),
     });
 
     // AABB for the tree
