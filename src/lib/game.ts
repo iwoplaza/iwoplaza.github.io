@@ -307,12 +307,12 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     let res = d.f32(1);
     let t = minT;
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 32; i++) {
       if (t >= maxT) break;
       const h = getSceneDist(std.add(ro, std.mul(rd, t))).dist;
-      if (h < 0.001) return 0;
+      if (h < 0.0) return 0;
       res = std.min(res, (k * h) / t);
-      t += std.max(h, 0.001);
+      t += std.max(h, 0.01);
     }
 
     return res;
