@@ -3,6 +3,7 @@ import tgpu, { type TgpuRoot } from 'typegpu';
 import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
 import { mat3, mat4 } from 'wgpu-matrix';
+import { extractAnglesBetweenPoints, solveIK } from './ik.ts';
 import {
   opElongate,
   opSubtraction,
@@ -13,7 +14,6 @@ import {
   shapeUnion,
   smoothShapeUnion,
 } from './sdf.ts';
-import { extractAnglesBetweenPoints, solveIK } from './ik.ts';
 
 // Palette
 // const skinColor = d.vec3f(0.3, 0.8, 0.4);

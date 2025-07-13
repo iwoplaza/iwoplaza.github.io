@@ -53,7 +53,7 @@ export function extractAnglesBetweenPoints(points: readonly v3f[]): v2f[] {
   for (let i = 0; i < points.length - 1; ++i) {
     const curr = points[i];
     const next = points[i + 1];
-    const dir = sub(next, curr);
+    const dir = normalize(sub(next, curr));
 
     const pitch = Math.asin(dir.z);
     const roll = Math.asin(dir.x);
