@@ -11,6 +11,7 @@ import {
   sdOctahedron,
   shapeUnion,
   smoothShapeUnion,
+  sdVerticalCapsule,
 } from './sdf.ts';
 
 // Palette
@@ -113,7 +114,7 @@ const getBackpack = tgpu.fn(
     d.vec3f(0, 0.1, 0.5),
   );
   strapP = std.mul(strapRot.$, strapP);
-  strapP = opElongate(strapP, d.vec3f(0.4, 0.1, 0.07));
+  strapP = opElongate(strapP, d.vec3f(0.3, 0.1, 0.07));
   backpack = opUnion(
     backpack,
     sdCappedTorus(
@@ -140,16 +141,19 @@ const getFrogBody = tgpu.fn(
   localP.x = std.abs(localP.x);
 
   const torsoP = std.sub(localP, d.vec3f(0, 0.8, 0));
-  let torso = sdOctahedron(opElongate(torsoP, d.vec3f(0.2, 0.5, 0)), 0.1) - 0.4;
+  let torso = sdOctahedron(opElongate(torsoP, d.vec3f(0.2, 0.3, 0)), 0.1) - 0.4;
   const shoulderP = std.mul(
     shoulderRot.$,
-    std.sub(localP, d.vec3f(0.7, 1.3, 0)),
+    std.sub(localP, d.vec3f(0.7, 1.2, 0)),
   );
   torso = opSmoothUnion(
     torso,
     sdRoundedBox3d(shoulderP, d.vec3f(0.3), 0.3),
     0.1,
   );
+  // Neck
+  const neckP = std.sub(localP, d.vec3f(0, 1.5, 0));
+  torso = opSmoothUnion(torso, sdVerticalCapsule(neckP, 0.5, 0.2), 0.2);
   const torsoShape = Shape({
     dist: torso,
     color: skinColor,

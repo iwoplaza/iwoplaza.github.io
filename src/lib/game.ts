@@ -16,15 +16,15 @@ import {
   sortHits,
 } from './sdf.ts';
 
-const pixelation = 4;
 const INSPECT = false;
+const pixelation = INSPECT ? 1 : 4;
 const gameCameraOptions = {
   radius: 5,
   yaw: -Math.PI / 4,
   pitch: 0.8,
 };
 const inspectCameraOptions = {
-  radius: 2,
+  radius: 3,
   yaw: 0,
   pitch: 0,
 };

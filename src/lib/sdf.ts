@@ -130,6 +130,14 @@ export const sdCappedTorus = tgpu.fn(
   return std.sqrt(std.dot(p, p) + ra * ra - 2.0 * ra * k) - rb;
 });
 
+export const sdVerticalCapsule = tgpu.fn(
+  [d.vec3f, d.f32, d.f32],
+  d.f32,
+)((p, h, r) => {
+  const py = std.clamp(p.y, 0, h);
+  return std.length(d.vec3f(p.x, p.y - py, p.z)) - r;
+});
+
 /**
  * c is the sin/cos of the angle, h is height
  */
