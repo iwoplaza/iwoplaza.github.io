@@ -10,58 +10,8 @@ import {
   sdRoundedBox3d,
   sdSphere,
 } from "@typegpu/sdf";
-
-const opSubtraction = tgpu.fn([d.f32, d.f32], d.f32)((d1, d2) =>
-  std.max(-d1, d2)
-);
-
-const opElongate = tgpu.fn([d.vec3f, d.vec3f])((p, h) =>
-  std.sub(p, std.clamp(p, std.neg(h), h))
-);
-
-// float opSmoothSubtraction( float d1, float d2, float k )
-// {
-//     float h = clamp( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
-//     return mix( d2, -d1, h ) + k*h*(1.0-h);
-// }
-
-const sdCylinder = tgpu.fn([d.vec3f, d.f32, d.f32], d.f32)((p, r, h) => {
-  const dd = d.vec2f(std.length(p.xz), p.y);
-  const q = d.vec2f(dd.x - r, std.abs(dd.y) - h / 2);
-  return std.min(std.max(q.x, q.y), 0) + std.length(std.max(q, d.vec2f()));
-});
-
-const sdRoundedCylinder = tgpu.fn([d.vec3f, d.f32, d.f32, d.f32], d.f32)(
-  (p, ra, rb, h) => {
-    const dd = d.vec2f(std.length(p.xz) - 2.0 * ra + rb, std.abs(p.y) - h);
-    return std.min(std.max(dd.x, dd.y), 0.0) +
-      std.length(std.max(dd, d.vec2f())) - rb;
-  },
-);
-
-const sdCappedTorus = tgpu.fn([d.vec3f, d.vec2f, d.f32, d.f32], d.f32)(
-  (p, sc, ra, rb) => {
-    const px = d.vec3f(std.abs(p.x), p.y, p.z);
-    const k = std.select(
-      std.dot(px.xy, sc),
-      std.length(px.xy),
-      sc.y * px.x > sc.x * px.y,
-    );
-    return std.sqrt(std.dot(p, p) + ra * ra - 2.0 * ra * k) - rb;
-  },
-);
-
-/**
- * c is the sin/cos of the angle, h is height
- */
-const sdCone = tgpu.fn([d.vec3f, d.vec2f, d.f32], d.f32)((p, c, h) => {
-  const q = std.length(p.xz);
-  return std.max(std.dot(c.xy, d.vec2f(q, p.y)), -h - p.y);
-});
-
-const smoothstep = tgpu.fn([d.f32, d.f32, d.f32], d.f32)`(a, b, t) {
-  return smoothstep(a, b, t);
-}`;
+import { createFrog, FrogRig } from "./frog.ts";
+import { sdCone, sdCylinder, Shape, shapeUnion, smoothShapeUnion } from "./sdf.ts";
 
 export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   const root = await tgpu.init();
@@ -216,90 +166,19 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const skyColor = d.vec4f(0.7, 0.8, 0.9, 1);
 
-  // Structure to hold both distance and color
-  const Shape = d.struct({
-    color: d.vec3f,
-    dist: d.f32,
-  });
 
   const checkerBoard = tgpu.fn([d.vec2f], d.f32)((uv) => {
     const fuv = std.floor(uv);
     return std.abs(fuv.x + fuv.y) % 2;
   });
 
-  const smoothShapeUnion = tgpu.fn([Shape, Shape, d.f32], Shape)((a, b, k) => {
-    const h = std.max(k - std.abs(a.dist - b.dist), 0) / k;
-    const m = h * h;
-
-    // Smooth min for distance
-    const dist = std.min(a.dist, b.dist) - m * k * (1 / d.f32(4));
-
-    // Blend colors based on relative distances and smoothing
-    const weight = m + std.select(0, 1 - m, a.dist > b.dist);
-    const color = std.mix(a.color, b.color, weight);
-
-    return { dist, color };
+  const frogRigCpu = FrogRig({
+    head: mat4.identity(d.mat4x4f()),
   });
-
-  const shapeUnion = tgpu.fn([Shape, Shape], Shape)((a, b) => ({
-    color: std.select(a.color, b.color, a.dist > b.dist),
-    dist: std.min(a.dist, b.dist),
-  }));
-
-  const getFrog = tgpu.fn([d.vec3f], Shape)((p) => {
-    const center = d.vec3f(0, 2, 0);
-    const localP = std.sub(p, center);
-    // Symmetric along the X-axis
-    localP.x = std.abs(localP.x);
-    const skinColor = d.vec3f(0.3, 0.8, 0.4);
-    // let head = sdRoundedCylinder(localP.xzy, 0.5, 0.5, 0);
-    let head = sdRoundedBox3d(localP, d.vec3f(0.8, 0.7, 0.6), 0.6);
-    // head = opSmoothUnion(head, sdCappedTorus(localP, d.vec2f(1), 0, 1), 0.1);
-    const frownAngle = 2.95;
-    const frownP = d.vec3f(localP.x, -localP.y - 2.6, localP.z - 0.8);
-    const lipP = std.add(frownP, d.vec3f(0, 0, 0.2));
-    // Lip
-    head = opSmoothUnion(
-      head,
-      sdCappedTorus(
-        lipP,
-        d.vec2f(std.sin(frownAngle), std.cos(frownAngle)),
-        2.5,
-        0.2,
-      ),
-      0.3,
-    );
-    // Frown
-    head = opSubtraction(
-      sdCappedTorus(
-        frownP,
-        d.vec2f(std.sin(frownAngle), std.cos(frownAngle)),
-        2.5,
-        0.07,
-      ),
-      head,
-    );
-    // EyeBulge
-    const eyeBulgeP = std.add(localP, d.vec3f(-0.5, -0.35, -0.2));
-    head = opSmoothUnion(head, sdSphere(eyeBulgeP, 0.4), 0.2);
-    // Cheek
-    const cheekP = std.add(localP, d.vec3f(-0.5, 0.2, -0.2));
-    head = opSmoothUnion(head, sdSphere(cheekP, 0.4), 0.2);
-    // ...
-
-    const headShape = Shape({
-      dist: head,
-      color: skinColor,
-    });
-
-    const eyeP = std.add(localP, d.vec3f(-0.45, -0.3, -0.5));
-    const eyeShape = Shape({
-      dist: sdSphere(eyeP, 0.2),
-      color: d.vec3f(),
-    });
-
-    return shapeUnion(headShape, eyeShape);
-  });
+  const frogRig = root.createUniform(FrogRig, frogRigCpu);
+  function updateFrogRig() {
+    frogRig.write(frogRigCpu);
+  }
 
   const getPineTree = tgpu.fn([d.vec3f], Shape)((p) => {
     const treePos = d.vec3f(-3, 0, 2);
@@ -343,50 +222,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     return tree;
   });
 
-  const getMorphingShape = tgpu.fn([d.vec3f, d.f32], Shape)((p, t) => {
-    // Center position
-    const center = d.vec3f(0, 2, 0);
-    const localP = std.sub(p, center);
-    const rotMatZ = d.mat4x4f.rotationZ(-t);
-    const rotMatX = d.mat4x4f.rotationX(-t * 0.6);
-    const rotatedP = std.mul(rotMatZ, std.mul(rotMatX, d.vec4f(localP, 1))).xyz;
-
-    // Animate shapes
-    const boxSize = d.vec3f(0.7);
-
-    // Create two spheres that move in a circular pattern
-    const sphere1Offset = d.vec3f(
-      std.cos(t * 2) * 0.8,
-      std.sin(t * 3) * 0.3,
-      std.sin(t * 2) * 0.8,
-    );
-    const sphere2Offset = d.vec3f(
-      std.cos(t * 2 + 3.14) * 0.8,
-      std.sin(t * 3 + 1.57) * 0.3,
-      std.sin(t * 2 + 3.14) * 0.8,
-    );
-
-    // Calculate distances and assign colors
-    const sphere1 = Shape({
-      dist: sdSphere(std.sub(localP, sphere1Offset), 0.5),
-      color: d.vec3f(0.4, 0.5, 1),
-    });
-    const sphere2 = Shape({
-      dist: sdSphere(std.sub(localP, sphere2Offset), 0.3),
-      color: d.vec3f(1, 0.8, 0.2),
-    });
-    const box = Shape({
-      dist: sdBoxFrame3d(rotatedP, boxSize, 0.1),
-      color: d.vec3f(1.0, 0.3, 0.3),
-    });
-
-    // Smoothly blend shapes and colors
-    const spheres = smoothShapeUnion(sphere1, sphere2, 0.1);
-    return smoothShapeUnion(spheres, box, 0.2);
-  });
+  const frog = createFrog(root);
 
   const getSceneDist = tgpu.fn([d.vec3f], Shape)((p) => {
-    const frog = getFrog(p);
+    const frogShape = frog.getFrog(p);
     const tree = getPineTree(p);
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
@@ -397,7 +236,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       ),
     });
 
-    const sceneWithTree = shapeUnion(frog, tree);
+    const sceneWithTree = shapeUnion(frogShape, tree);
     return shapeUnion(sceneWithTree, floor);
   });
 
@@ -536,6 +375,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   let animationFrame: number;
   function run(timestamp: number) {
     time.write(timestamp / 1000 % 1000);
+    updateFrogRig();
 
     renderPipeline
       .withColorAttachment({
