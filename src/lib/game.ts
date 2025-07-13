@@ -19,7 +19,7 @@ import {
 const INSPECT = false;
 const pixelation = INSPECT ? 1 : 4;
 const gameCameraOptions = {
-  radius: 8,
+  radius: 6,
   yaw: -Math.PI / 4,
   pitch: 0.8,
 };
@@ -60,7 +60,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   const time = root.createUniform(d.f32);
 
-  const MAX_STEPS = 100;
+  const MAX_STEPS = 200;
   const MAX_DIST = 100;
   const SURF_DIST = 0.02;
 
@@ -78,8 +78,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     [d.vec3f],
     Shape,
   )((p) => {
-    // Repeat in XZ plane with 8x8 grid spacing
-    const cellSize = d.f32(8);
+    // Repeat in XZ plane with 16x16 grid spacing
+    const cellSize = d.f32(16);
     const cellId = std.floor(std.div(p.xz, cellSize));
     const cellP = std.sub(p.xz, std.mul(cellId, cellSize));
 
@@ -97,13 +97,13 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     );
 
 
-    const scaledP = std.div(localP, 2);
+    const scaledP = std.div(localP, 4);
 
     // Trunk
     const trunkHeight = d.f32(2);
     const trunkRadius = d.f32(0.15);
     const trunk = Shape({
-      dist: std.mul(sdCylinder(scaledP, trunkRadius, trunkHeight), 2),
+      dist: std.mul(sdCylinder(scaledP, trunkRadius, trunkHeight), 4),
       color: d.vec3f(0.4, 0.2, 0.1),
     });
 
@@ -113,7 +113,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     // Bottom layer
     const layer1Pos = std.sub(scaledP, d.vec3f(0, 1.8, 0));
     const layer1 = Shape({
-      dist: std.mul(sdCone(layer1Pos, d.vec2f(std.sin(1), std.cos(1)), 1), 2),
+      dist: std.mul(sdCone(layer1Pos, d.vec2f(std.sin(1), std.cos(1)), 1), 4),
       color: d.vec3f(0.1, 0.4, 0.1),
     });
     tree = shapeUnion(tree, layer1);
@@ -123,7 +123,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const layer2 = Shape({
       dist: std.mul(
         sdCone(layer2Pos, d.vec2f(std.sin(1.1), std.cos(1.1)), 1),
-        2,
+        4,
       ),
       color: d.vec3f(0.15, 0.5, 0.15),
     });
@@ -134,7 +134,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const layer3 = Shape({
       dist: std.mul(
         sdCone(layer3Pos, d.vec2f(std.sin(1.2), std.cos(1.2)), 1),
-        2,
+        4,
       ),
       color: d.vec3f(0.2, 0.6, 0.2),
     });
@@ -350,7 +350,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     // AABB for the infinite repeating trees
     aabbs[2] = AABB({
       min: d.vec3f(-100, 0, -100),
-      max: d.vec3f(100, 8, 100),
+      max: d.vec3f(100, 16, 100),
     });
 
     // Update the uniforms
