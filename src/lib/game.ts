@@ -47,7 +47,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     canvas.height = height;
 
     const aspect = canvas.width / canvas.height;
-    const fov = (50 / 180) * Math.PI;
+    const fov = (30 / 180) * Math.PI;
     mat4.identity(invProj);
     mat4.scale(invProj, d.vec3f(aspect, 1, 1 / Math.tan(fov)), invProj);
     uploadUniforms();
@@ -64,9 +64,12 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   let prevY = 0;
   const orbitOrigin = d.vec3f(0, 4, 0);
   // Yaw and pitch angles facing the origin.
-  let orbitRadius = 2;
-  let orbitYaw = 0;
-  let orbitPitch = 0;
+  // let orbitRadius = 2;
+  // let orbitYaw = 0;
+  // let orbitPitch = 0;
+  let orbitRadius = 5;
+  let orbitYaw = -Math.PI / 4;
+  let orbitPitch = 0.7;
 
   function updateCameraOrbit(dx: number, dy: number) {
     const orbitSensitivity = 0.005;
