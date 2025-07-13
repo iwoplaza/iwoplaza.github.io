@@ -69,7 +69,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   // let orbitPitch = 0;
   let orbitRadius = 5;
   let orbitYaw = -Math.PI / 4;
-  let orbitPitch = 0.7;
+  let orbitPitch = 0.8;
 
   function updateCameraOrbit(dx: number, dy: number) {
     const orbitSensitivity = 0.005;
@@ -165,7 +165,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   const time = root.createUniform(d.f32);
 
   const MAX_STEPS = 100;
-  const MAX_DIST = 50;
+  const MAX_DIST = 100;
   const SURF_DIST = 0.02;
 
   const skyColor = d.vec4f(0.7, 0.8, 0.9, 1);
@@ -233,12 +233,15 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const tree = getPineTree(p);
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
-      color: std.mix(d.vec3f(1), d.vec3f(0.2), checkerBoard(std.mul(p.xz, 2))),
+      color: std.mix(
+        d.vec3f(0.3, 0.8, 0.4),
+        d.vec3f(0.2, 0.6, 0.3),
+        checkerBoard(std.mul(p.xz, 0.5)),
+      ),
     });
 
     const sceneWithTree = shapeUnion(frogShape, tree);
     return shapeUnion(sceneWithTree, floor);
-    // return sceneWithTree;
   });
 
   const createArray = tgpu.fn([], d.arrayOf(AABBHit, MAX_AABBS))`() {
@@ -420,8 +423,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     // AABB for the floor
     aabbs[1] = AABB({
-      min: d.vec3f(-10, -1, -10), // Approximate bounds
-      max: d.vec3f(10, 0, 10),
+      min: d.vec3f(-100, -1, -100), // Approximate bounds
+      max: d.vec3f(100, 0, 100),
     });
 
     // AABB for the tree

@@ -11,12 +11,7 @@ import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
     <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
   </head>
   <body class="bg-white text-[#333932] dark:bg-[#333932] dark:text-white">
-    <Header />
     <canvas id="canvas" class="fixed inset-0 w-full h-full"></canvas>
-    <main class="container mx-auto mt-20 min-h-screen">
-      <h1 class="text-center">(under construction)</h1>
-    </main>
-    <Footer />
     <script>
       import { game } from '../lib/game.ts';
       const canvas = document.getElementById('canvas') as HTMLCanvasElement;
