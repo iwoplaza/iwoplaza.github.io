@@ -13,6 +13,7 @@ import {
   shapeUnion,
   smoothShapeUnion,
 } from './sdf.ts';
+import { extractAnglesBetweenPoints, solveIK } from './ik.ts';
 
 // Palette
 // const skinColor = d.vec3f(0.3, 0.8, 0.4);
@@ -187,6 +188,7 @@ const getShin = tgpu.fn(
 
 export const FrogRig = d.struct({
   head: d.mat4x4f,
+  body: d.mat4x4f,
   leftArm: d.mat4x4f,
   leftForearm: d.mat4x4f,
   leftThigh: d.mat4x4f,
@@ -199,6 +201,7 @@ export function createFrog(root: TgpuRoot) {
   let headYaw = 0;
   const frogRigCpu = FrogRig({
     head: mat4.identity(d.mat4x4f()),
+    body: mat4.identity(d.mat4x4f()),
     leftArm: mat4.identity(d.mat4x4f()),
     leftForearm: mat4.identity(d.mat4x4f()),
     leftThigh: mat4.identity(d.mat4x4f()),
@@ -213,15 +216,15 @@ export function createFrog(root: TgpuRoot) {
     [d.vec3f],
     Shape,
   )((p) => {
-    const headOrigin = d.vec3f(0, 4.2, 0);
+    const headOrigin = d.vec3f(0, 1.9, 0);
     const hp = std.sub(p, headOrigin);
     const thp = std.mul(frogRig.$.head, d.vec4f(hp, 1)).xyz;
 
-    const bodyOrigin = d.vec3f(0, 2.3, 0);
+    const bodyOrigin = d.vec3f();
     const bp = std.sub(p, bodyOrigin);
-    const tbp = bp; // TODO: Transform
+    const tbp = std.mul(frogRig.$.body, d.vec4f(bp, 1)).xyz;
 
-    const leftArmOrigin = d.vec3f(-0.7, 3.55, 0);
+    const leftArmOrigin = d.vec3f(-0.7, 1.25, 0);
     const leftArmP = std.sub(p, leftArmOrigin);
     const leftArmTP = std.mul(frogRig.$.leftArm, d.vec4f(leftArmP, 1)).xyz;
 
@@ -230,7 +233,7 @@ export function createFrog(root: TgpuRoot) {
       d.vec4f(leftArmP, 1),
     ).xyz;
 
-    const leftThighOrigin = d.vec3f(-0.3, 2.3, 0);
+    const leftThighOrigin = d.vec3f(-0.3, 0, 0);
     const leftThighP = std.sub(p, leftThighOrigin);
     const leftThighTP = std.mul(
       frogRig.$.leftThigh,
@@ -248,56 +251,63 @@ export function createFrog(root: TgpuRoot) {
     return shapeUnion(skin, backpack);
   });
 
+  const legChain = [0.8, 0.8];
+
   return {
     getFrog,
     update(dt: number) {
+      const { body, head, leftArm, leftForearm, leftThigh, leftShin } =
+        frogRigCpu;
+
       progress += dt;
       headYaw = Math.cos(progress);
       headPitch = Math.sin(progress * 10) * 0.2;
 
+      const hipPos = d.vec3f(0, -1.5 + Math.sin(progress * 2) * 0.2, 0);
+
       // All transformations are inverse, since it's actually the inverse
       // transformation matrix we're sending over to the GPU
-      mat4.identity(frogRigCpu.head);
-      mat4.rotateX(frogRigCpu.head, -headPitch, frogRigCpu.head);
-      mat4.rotateY(frogRigCpu.head, -headYaw, frogRigCpu.head);
+      mat4.identity(head);
+      mat4.rotateX(head, -headPitch, head);
+      mat4.rotateY(head, -headYaw, head);
+      mat4.translate(head, hipPos, head);
+
+      // Body
+      mat4.identity(body);
+      mat4.translate(body, hipPos, body);
 
       // Left arm
-      mat4.identity(frogRigCpu.leftArm);
-      mat4.rotateZ(
-        frogRigCpu.leftArm,
-        -0.3 + Math.sin(progress) * 0.1,
-        frogRigCpu.leftArm,
-      );
-      mat4.rotateX(frogRigCpu.leftArm, Math.PI - 0.2, frogRigCpu.leftArm);
+      mat4.identity(leftArm);
+      mat4.rotateZ(leftArm, -0.3 + Math.sin(progress) * 0.1, leftArm);
+      mat4.rotateX(leftArm, Math.PI - 0.2, leftArm);
+      mat4.translate(leftArm, hipPos, leftArm);
 
       // Left forearm
-      mat4.identity(frogRigCpu.leftForearm);
-      mat4.rotateX(frogRigCpu.leftForearm, 0.4, frogRigCpu.leftForearm);
-      mat4.translate(
-        frogRigCpu.leftForearm,
-        d.vec3f(0, -0.7, 0),
-        frogRigCpu.leftForearm,
-      );
-      mat4.mul(
-        frogRigCpu.leftForearm,
-        frogRigCpu.leftArm,
-        frogRigCpu.leftForearm,
-      );
+      mat4.identity(leftForearm);
+      mat4.rotateX(leftForearm, 0.4, leftForearm);
+      mat4.translate(leftForearm, d.vec3f(0, -0.7, 0), leftForearm);
+      mat4.mul(leftForearm, leftArm, leftForearm);
+
+      const leftLegTarget = d.vec3f(0, -hipPos.y, 0);
+      const leftLegPoints = solveIK(legChain, leftLegTarget);
+      const leftLegAngles = extractAnglesBetweenPoints(leftLegPoints);
 
       // Left thigh
-      mat4.identity(frogRigCpu.leftThigh);
-      mat4.rotateZ(frogRigCpu.leftThigh, -0.1, frogRigCpu.leftThigh);
-      mat4.rotateX(frogRigCpu.leftThigh, Math.PI + 0.2, frogRigCpu.leftThigh);
+      mat4.identity(leftThigh);
+      mat4.rotateZ(leftThigh, leftLegAngles[0].y, leftThigh);
+      mat4.rotateX(leftThigh, Math.PI + leftLegAngles[0].x, leftThigh);
+      mat4.translate(leftThigh, hipPos, leftThigh);
 
       // Left shin
-      mat4.identity(frogRigCpu.leftShin);
-      mat4.rotateX(frogRigCpu.leftShin, -0.4, frogRigCpu.leftShin);
-      mat4.translate(
-        frogRigCpu.leftShin,
-        d.vec3f(0, -0.8, 0),
-        frogRigCpu.leftShin,
-      );
-      mat4.mul(frogRigCpu.leftShin, frogRigCpu.leftThigh, frogRigCpu.leftShin);
+      mat4.identity(leftShin);
+      // Undoing parent rotation
+      mat4.rotateX(leftShin, -leftLegAngles[0].x, leftShin);
+      mat4.rotateZ(leftShin, -leftLegAngles[0].y, leftShin);
+      // Local rotation
+      mat4.rotateZ(leftShin, leftLegAngles[1].y, leftShin);
+      mat4.rotateX(leftShin, leftLegAngles[1].x, leftShin);
+      mat4.translate(leftShin, d.vec3f(0, -0.8, 0), leftShin);
+      mat4.mul(leftShin, leftThigh, leftShin);
     },
     uploadRig,
   };
