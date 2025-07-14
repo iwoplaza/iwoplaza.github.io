@@ -306,7 +306,7 @@ export function createFrog(root: TgpuRoot) {
       headYaw = Math.cos(progress);
       headPitch = Math.sin(progress * 10) * 0.2;
 
-      const hipPos = d.vec3f(0, -1.5 + Math.sin(progress * 2) * 0.2, 0);
+      const hipPos = d.vec3f(0, -1.8 + Math.sin(progress * 2) * 0.2, 0);
 
       // All transformations are inverse, since it's actually the inverse
       // transformation matrix we're sending over to the GPU
@@ -343,7 +343,7 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(rightForearm, d.vec3f(0, -0.7, 0), rightForearm);
       mat4.mul(rightForearm, rightArm, rightForearm);
 
-      const leftLegTarget = d.vec3f(0, -hipPos.y, 0);
+      const leftLegTarget = d.vec3f(-0.3, -hipPos.y, 0);
       const leftLegPoints = solveIK(legChain, leftLegTarget);
       const leftLegAngles = extractAnglesBetweenPoints(leftLegPoints);
 
@@ -364,7 +364,7 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(leftShin, d.vec3f(0, -0.8, 0), leftShin);
       mat4.mul(leftShin, leftThigh, leftShin);
 
-      const rightLegTarget = d.vec3f(0, -hipPos.y, 0);
+      const rightLegTarget = d.vec3f(0.3, -hipPos.y, 0);
       const rightLegPoints = solveIK(legChain, rightLegTarget);
       const rightLegAngles = extractAnglesBetweenPoints(rightLegPoints);
 
