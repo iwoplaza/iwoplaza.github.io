@@ -376,7 +376,9 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     lastTime = timestamp;
     time.write((timestamp / 1000) % 1000);
 
-    gizmoState.enable();
+    if (INSPECT) {
+      gizmoState.enable();
+    }
     frog.update(dt);
     frog.uploadRig();
     updateSceneAABBs();
@@ -391,8 +393,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       })
       .draw(3);
 
-    gizmoState.draw(view);
-    gizmoState.disable();
+    if (INSPECT) {
+      gizmoState.draw(view);
+      gizmoState.disable();
+    }
     animationFrame = requestAnimationFrame(run);
   }
   requestAnimationFrame(run);
