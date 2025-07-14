@@ -217,9 +217,12 @@ export function createFrog(root: TgpuRoot) {
   let leftFootYaw = 0;
   let rightFootYaw = 0;
   const body = new Bone(d.vec3f(), d.vec4f(), {});
+  const head = new Bone(d.vec3f(0, 1.9, 0), d.vec4f(), { parent: body });
+  const leftThigh = new Bone(d.vec3f(-0.3, 0, 0), d.vec4f(), { parent: body });
+  const rightThigh = new Bone(d.vec3f(0.3, 0, 0), d.vec4f(), { parent: body });
   const frogRigCpu = FrogRig({
     head: mat4.identity(d.mat4x4f()),
-    body: body.invMat,
+    body: mat4.identity(d.mat4x4f()),
     leftArm: mat4.identity(d.mat4x4f()),
     leftForearm: mat4.identity(d.mat4x4f()),
     rightArm: mat4.identity(d.mat4x4f()),
@@ -229,7 +232,11 @@ export function createFrog(root: TgpuRoot) {
     rightThigh: mat4.identity(d.mat4x4f()),
     rightShin: mat4.identity(d.mat4x4f()),
   });
-  frogRigCpu.body = body.invMat; // Overriding the clone
+  // Overriding the clones
+  frogRigCpu.body = body.invMat;
+  frogRigCpu.head = head.invMat;
+  frogRigCpu.leftThigh = leftThigh.invMat;
+  frogRigCpu.rightThigh = rightThigh.invMat;
   const frogRig = root.createUniform(FrogRig, frogRigCpu);
   function uploadRig() {
     frogRig.write(frogRigCpu);
@@ -239,26 +246,16 @@ export function createFrog(root: TgpuRoot) {
     [d.vec3f],
     Shape,
   )((p) => {
-    const headOrigin = d.vec3f(0, 1.9, 0);
-    const hp = std.sub(p, headOrigin);
-    const thp = std.mul(frogRig.$.head, d.vec4f(hp, 1)).xyz;
-
-    const bodyOrigin = d.vec3f();
-    const bp = std.sub(p, bodyOrigin);
-    const tbp = std.mul(frogRig.$.body, d.vec4f(bp, 1)).xyz;
+    const thp = std.mul(frogRig.$.head, d.vec4f(p, 1)).xyz;
+    const tbp = std.mul(frogRig.$.body, d.vec4f(p, 1)).xyz;
 
     const leftArmTP = std.mul(frogRig.$.leftArm, d.vec4f(p, 1)).xyz;
     const leftForearmTP = std.mul(frogRig.$.leftForearm, d.vec4f(p, 1)).xyz;
-
     const rightArmTP = std.mul(frogRig.$.rightArm, d.vec4f(p, 1)).xyz;
     const rightForearmTP = std.mul(frogRig.$.rightForearm, d.vec4f(p, 1)).xyz;
-
     const leftThighTP = std.mul(frogRig.$.leftThigh, d.vec4f(p, 1)).xyz;
-
     const leftShinTP = std.mul(frogRig.$.leftShin, d.vec4f(p, 1)).xyz;
-
     const rightThighTP = std.mul(frogRig.$.rightThigh, d.vec4f(p, 1)).xyz;
-
     const rightShinTP = std.mul(frogRig.$.rightShin, d.vec4f(p, 1)).xyz;
 
     let skin = shapeUnion(getFrogHead(thp), getArm(leftArmTP));
@@ -281,14 +278,11 @@ export function createFrog(root: TgpuRoot) {
     getFrog,
     update(dt: number) {
       const {
-        head,
         leftArm,
         leftForearm,
         rightArm,
         rightForearm,
-        leftThigh: invLeftThigh,
         leftShin,
-        rightThigh: invRightThigh,
         rightShin,
       } = frogRigCpu;
 
@@ -306,10 +300,9 @@ export function createFrog(root: TgpuRoot) {
       body.pos.x = -Math.sin(progress * 1.5) * 0.6;
       body.pos.y = 1.3 - Math.sin(progress * 3) * 0.1;
       body.pos.z = 0;
-      const invHipPos = std.neg(body.pos);
       const chestPos = std.add(body.pos, d.vec3f(0, 1, 0));
 
-      quatn.fromEuler(0, bodyYaw, 0, 'xyz', body.rot);
+      quatn.fromEuler(0, bodyYaw, 0, 'yxz', body.rot);
       body.compute();
 
       const leftArmLocalPos = d.vec3f(-0.7, 1.25, 0);
@@ -322,19 +315,6 @@ export function createFrog(root: TgpuRoot) {
       const rightArmLocalPos = d.vec3f(0.7, 1.25, 0);
       const rightArmGlobalPos = vec3.transformMat4(
         rightArmLocalPos,
-        body.mat,
-        d.vec3f(),
-      );
-
-      const leftLegLocalPos = d.vec3f(-0.3, 0, 0);
-      const leftLegGlobalPos = vec3.transformMat4(
-        leftLegLocalPos,
-        body.mat,
-        d.vec3f(),
-      );
-      const rightLegLocalPos = d.vec3f(0.3, 0, 0);
-      const rightLegGlobalPos = vec3.transformMat4(
-        rightLegLocalPos,
         body.mat,
         d.vec3f(),
       );
@@ -356,10 +336,8 @@ export function createFrog(root: TgpuRoot) {
       // );
 
       // HEAD
-      mat4.identity(head);
-      mat4.rotateX(head, -headPitch, head);
-      mat4.rotateY(head, -headYaw, head);
-      mat4.translate(head, invHipPos, head);
+      quatn.fromEuler(headPitch, headYaw, 0, 'yxz', head.rot);
+      head.compute();
 
       // LEFT ARM
       mat4.identity(leftArm);
@@ -397,6 +375,17 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(rightForearm, d.vec3f(0, -0.7, 0), rightForearm);
       mat4.mul(rightForearm, rightArm, rightForearm);
 
+      // Legs
+      const leftLegGlobalPos = vec3.transformMat4(
+        leftThigh.pos,
+        body.mat,
+        d.vec3f(),
+      );
+      const rightLegGlobalPos = vec3.transformMat4(
+        rightThigh.pos,
+        body.mat,
+        d.vec3f(),
+      );
       const leftLegPull = d.vec3f(
         Math.sin(leftFootYaw),
         0,
@@ -431,21 +420,9 @@ export function createFrog(root: TgpuRoot) {
         rightLegPull,
       );
 
-      // LEFT THIGH (inv)
-      const leftThighRot = leftLegMats[0];
-      const leftThighInvRot = mat3.transpose(leftThighRot);
-      mat4.identity(invLeftThigh);
-      // Local transform
-      mat4.rotateX(invLeftThigh, Math.PI, invLeftThigh);
-      mat4.mul(invLeftThigh, mat4.fromMat3(leftThighInvRot), invLeftThigh);
-      // Undoing parent rotation
-      mat4.rotateY(invLeftThigh, bodyYaw, invLeftThigh);
-      // Lock into place
-      mat4.translate(invLeftThigh, std.mul(leftLegLocalPos, -1), invLeftThigh);
-      // Parent transform
-      mat4.mul(invLeftThigh, body.invMat, invLeftThigh);
-      // LEFT THIGH (normal)
-      const leftThigh = mat4.invert(invLeftThigh, d.mat4x4f());
+      quatn.fromMat(leftLegMats[0], leftThigh.rot);
+      quatn.rotateX(leftThigh.rot, -Math.PI, leftThigh.rot);
+      leftThigh.compute();
 
       // Left shin
       const leftShinInvRot = mat3.transpose(leftLegMats[1]);
@@ -454,27 +431,16 @@ export function createFrog(root: TgpuRoot) {
       mat4.rotateX(leftShin, Math.PI, leftShin);
       mat4.mul(leftShin, mat4.fromMat3(leftShinInvRot), leftShin);
       // Undoing parent rotation
-      mat4.mul(leftShin, mat4.fromMat3(mat3.fromMat4(leftThigh)), leftShin);
+      mat4.mul(leftShin, mat4.fromMat3(mat3.fromMat4(leftThigh.mat)), leftShin);
       // Lock into place
       mat4.translate(leftShin, d.vec3f(0, -legChain[1], 0), leftShin);
       // Parent transform
-      mat4.mul(leftShin, invLeftThigh, leftShin);
+      mat4.mul(leftShin, leftThigh.invMat, leftShin);
 
-      // RIGHT THIGH (inv)
-      const rightThighRot = rightLegMats[0];
-      const rightThighInvRot = mat3.transpose(rightThighRot);
-      mat4.identity(invRightThigh);
-      // Local transform
-      mat4.rotateX(invRightThigh, Math.PI, invRightThigh);
-      mat4.mul(invRightThigh, mat4.fromMat3(rightThighInvRot), invRightThigh);
-      // Undoing parent rotation
-      mat4.rotateY(invRightThigh, bodyYaw, invRightThigh);
-      // Lock into place
-      mat4.translate(invRightThigh, std.neg(rightLegLocalPos), invRightThigh);
-      // Parent transform
-      mat4.mul(invRightThigh, body.invMat, invRightThigh);
-      // RIGHT THIGH (normal)
-      const rightThigh = mat4.invert(invRightThigh, d.mat4x4f());
+      // RIGHT THIGH
+      quatn.fromMat(rightLegMats[0], rightThigh.rot);
+      quatn.rotateX(rightThigh.rot, -Math.PI, rightThigh.rot);
+      rightThigh.compute();
 
       // Right shin
       const rightShinInvRot = mat3.transpose(rightLegMats[1]);
@@ -483,11 +449,15 @@ export function createFrog(root: TgpuRoot) {
       mat4.rotateX(rightShin, Math.PI, rightShin);
       mat4.mul(rightShin, mat4.fromMat3(rightShinInvRot), rightShin);
       // Undoing parent rotation
-      mat4.mul(rightShin, mat4.fromMat3(mat3.fromMat4(rightThigh)), rightShin);
+      mat4.mul(
+        rightShin,
+        mat4.fromMat3(mat3.fromMat4(rightThigh.mat)),
+        rightShin,
+      );
       // Lock into place
       mat4.translate(rightShin, d.vec3f(0, -legChain[1], 0), rightShin);
       // Parent transform
-      mat4.mul(rightShin, invRightThigh, rightShin);
+      mat4.mul(rightShin, rightThigh.invMat, rightShin);
 
       /**
        *       // Left shin
