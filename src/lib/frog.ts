@@ -314,20 +314,7 @@ export function createFrog(root: TgpuRoot) {
       body.compute();
 
       const hipDir = d.vec3f(Math.sin(bodyYaw), 0, Math.cos(bodyYaw));
-
-      // const leftArmTarget = std.sub(d.vec3f(0.2, 0, 0), leftArmGlobalPos);
-      // const leftArmPoints = solveIK(armChain, leftArmTarget, hipDir);
-      // const leftArmMats = getRotationMatricesBetweenPoints(
-      //   leftArmPoints,
-      //   hipDir,
-      // );
-
-      // const rightArmTarget = std.sub(d.vec3f(0, 0, 0), rightArmGlobalPos);
-      // const rightArmPoints = solveIK(armChain, rightArmTarget, hipDir);
-      // const rightArmMats = getRotationMatricesBetweenPoints(
-      //   rightArmPoints,
-      //   hipDir,
-      // );
+      const armPull = std.neg(hipDir);
 
       // HEAD
       quatn.fromEuler(headPitch, headYaw, 0, 'yxz', head.rot);
@@ -346,30 +333,48 @@ export function createFrog(root: TgpuRoot) {
         d.vec3f(),
       );
 
+      const leftArmTarget = d.vec3f(-1.8, 2, 1);
+      const rightArmTarget = d.vec3f(1.8, 2, 1);
+
+      const leftArmPoints = solveIK(
+        armChain,
+        std.sub(leftArmTarget, leftArmGlobalPos),
+        armPull,
+      );
+      const rightArmPoints = solveIK(
+        armChain,
+        std.sub(rightArmTarget, rightArmGlobalPos),
+        armPull,
+      );
+
+      const leftArmMats = getRotationMatricesBetweenPoints(
+        leftArmPoints,
+        armPull,
+      );
+
+      const rightArmMats = getRotationMatricesBetweenPoints(
+        rightArmPoints,
+        armPull,
+      );
+
       // Left arm
-      quatn.identity(leftArm.rot);
-      quatn.rotateX(leftArm.rot, -Math.PI + 0.2, leftArm.rot);
-      quatn.rotateZ(leftArm.rot, 0.3 - Math.sin(progress) * 0.1, leftArm.rot);
+      quatn.fromMat(leftArmMats[0], leftArm.rot);
+      quatn.rotateX(leftArm.rot, -Math.PI, leftArm.rot);
       leftArm.compute();
 
       // Left forearm
-      quatn.identity(leftForearm.rot);
-      quatn.rotateX(leftForearm.rot, -0.4 - Math.PI, leftForearm.rot);
+      quatn.fromMat(leftArmMats[1], leftForearm.rot);
+      quatn.rotateX(leftForearm.rot, -Math.PI, leftForearm.rot);
       leftForearm.compute();
 
       // Right arm
-      quatn.identity(rightArm.rot);
-      quatn.rotateX(rightArm.rot, -Math.PI + 0.2, rightArm.rot);
-      quatn.rotateZ(
-        rightArm.rot,
-        -0.3 + Math.sin(progress) * 0.1,
-        rightArm.rot,
-      );
+      quatn.fromMat(rightArmMats[0], rightArm.rot);
+      quatn.rotateX(rightArm.rot, -Math.PI, rightArm.rot);
       rightArm.compute();
 
       // Right forearm
-      quatn.identity(rightForearm.rot);
-      quatn.rotateX(rightForearm.rot, -0.4 - Math.PI, rightForearm.rot);
+      quatn.fromMat(rightArmMats[1], rightForearm.rot);
+      quatn.rotateX(rightForearm.rot, -Math.PI, rightForearm.rot);
       rightForearm.compute();
 
       // Legs
