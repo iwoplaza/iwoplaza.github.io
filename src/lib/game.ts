@@ -15,6 +15,7 @@ import {
   shapeUnion,
   sortHits,
 } from './sdf.ts';
+import { createGizmoState } from './gizmo.ts';
 
 const INSPECT = false;
 const pixelation = INSPECT ? 1 : 4;
@@ -144,6 +145,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   });
 
   const frog = createFrog(root);
+  const gizmoState = createGizmoState(root);
 
   const getSceneDist = tgpu.fn(
     [d.vec3f],
@@ -373,19 +375,24 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const dt = (timestamp - lastTime) * 0.001;
     lastTime = timestamp;
     time.write((timestamp / 1000) % 1000);
+
+    gizmoState.enable();
     frog.update(dt);
     frog.uploadRig();
     updateSceneAABBs();
 
+    const view = context.getCurrentTexture().createView();
     renderPipeline
       .withColorAttachment({
-        view: context.getCurrentTexture().createView(),
+        view,
         clearValue: [1, 1, 1, 1],
         loadOp: 'clear',
         storeOp: 'store',
       })
       .draw(3);
 
+    gizmoState.draw(view);
+    gizmoState.disable();
     animationFrame = requestAnimationFrame(run);
   }
   requestAnimationFrame(run);

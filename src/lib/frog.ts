@@ -20,6 +20,7 @@ import {
   shapeUnion,
   smoothShapeUnion,
 } from './sdf.ts';
+import { Gizmo } from './gizmo.ts';
 
 // Palette
 // const skinColor = d.vec3f(0.3, 0.8, 0.4);
@@ -339,6 +340,10 @@ export function createFrog(root: TgpuRoot) {
         body,
         d.vec3f(),
       );
+
+      // Draw gizmos for left arm position
+      Gizmo.color(d.vec3f(1, 0, 0));
+      Gizmo.sphere(leftArmGlobalPos, 0.1);
 
       const armPull = d.vec3f(Math.sin(bodyYaw), 0, Math.cos(bodyYaw));
       const leftArmTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
