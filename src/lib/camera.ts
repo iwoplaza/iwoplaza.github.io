@@ -9,6 +9,11 @@ export interface OrbitOptions {
   yaw: number;
 }
 
+export const POV = d.struct({
+  invView: d.mat4x4f,
+  invViewProj: d.mat4x4f,
+});
+
 export function createOrbitCamera(
   root: TgpuRoot,
   touchSurface: HTMLElement,
@@ -32,12 +37,7 @@ export function createOrbitCamera(
     pov.writePartial({ invView, invViewProj });
   }
 
-  const pov = root.createUniform(
-    d.struct({
-      invView: d.mat4x4f,
-      invViewProj: d.mat4x4f,
-    }),
-  );
+  const pov = root.createUniform(POV);
 
   function updateOrbit(dx: number, dy: number) {
     const orbitSensitivity = 0.005;

@@ -145,7 +145,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   });
 
   const frog = createFrog(root);
-  const gizmoState = createGizmoState(root);
+  const gizmoState = createGizmoState(root, camera.pov);
 
   const getSceneDist = tgpu.fn(
     [d.vec3f],

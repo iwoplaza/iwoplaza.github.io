@@ -1,10 +1,4 @@
-import {
-  opSmoothUnion,
-  opUnion,
-  sdBox3d,
-  sdRoundedBox3d,
-  sdSphere,
-} from '@typegpu/sdf';
+import { opSmoothUnion, opUnion, sdRoundedBox3d, sdSphere } from '@typegpu/sdf';
 import tgpu, { type TgpuRoot } from 'typegpu';
 import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
@@ -177,28 +171,28 @@ const getThigh = tgpu.fn(
   [d.vec3f],
   Shape,
 )((p) => {
-  return {
-    dist: sdBox3d(std.sub(p, d.vec3f(0, 0.45, 0)), d.vec3f(0.2, 0.45, 0.2)),
-    color: skinColor,
-  };
   // return {
-  //   dist: sdVerticalCapsule(p, 0.7, 0.2),
+  //   dist: sdBox3d(std.sub(p, d.vec3f(0, 0.45, 0)), d.vec3f(0.2, 0.45, 0.2)),
   //   color: skinColor,
   // };
+  return {
+    dist: sdVerticalCapsule(p, 0.7, 0.2),
+    color: skinColor,
+  };
 });
 
 const getShin = tgpu.fn(
   [d.vec3f],
   Shape,
 )((p) => {
-  return {
-    dist: sdBox3d(std.sub(p, d.vec3f(0, 0.4, 0)), d.vec3f(0.2, 0.4, 0.2)),
-    color: skinColor,
-  };
   // return {
-  //   dist: sdVerticalCapsule(p, 0.8, 0.17),
+  //   dist: sdBox3d(std.sub(p, d.vec3f(0, 0.4, 0)), d.vec3f(0.2, 0.4, 0.2)),
   //   color: skinColor,
   // };
+  return {
+    dist: sdVerticalCapsule(p, 0.8, 0.17),
+    color: skinColor,
+  };
 });
 
 export const FrogRig = d.struct({
@@ -256,26 +250,13 @@ export function createFrog(root: TgpuRoot) {
     const rightArmTP = std.mul(frogRig.$.rightArm, d.vec4f(p, 1)).xyz;
     const rightForearmTP = std.mul(frogRig.$.rightForearm, d.vec4f(p, 1)).xyz;
 
-    const leftThighOrigin = d.vec3f(-0.3, 0, 0);
-    const leftThighP = std.sub(p, leftThighOrigin);
-    const leftThighTP = std.mul(
-      frogRig.$.leftThigh,
-      d.vec4f(leftThighP, 1),
-    ).xyz;
+    const leftThighTP = std.mul(frogRig.$.leftThigh, d.vec4f(p, 1)).xyz;
 
-    const leftShinTP = std.mul(frogRig.$.leftShin, d.vec4f(leftThighP, 1)).xyz;
+    const leftShinTP = std.mul(frogRig.$.leftShin, d.vec4f(p, 1)).xyz;
 
-    const rightThighOrigin = d.vec3f(0.3, 0, 0);
-    const rightThighP = std.sub(p, rightThighOrigin);
-    const rightThighTP = std.mul(
-      frogRig.$.rightThigh,
-      d.vec4f(rightThighP, 1),
-    ).xyz;
+    const rightThighTP = std.mul(frogRig.$.rightThigh, d.vec4f(p, 1)).xyz;
 
-    const rightShinTP = std.mul(
-      frogRig.$.rightShin,
-      d.vec4f(rightThighP, 1),
-    ).xyz;
+    const rightShinTP = std.mul(frogRig.$.rightShin, d.vec4f(p, 1)).xyz;
 
     let skin = shapeUnion(getFrogHead(thp), getArm(leftArmTP));
     skin = smoothShapeUnion(skin, getForearm(leftForearmTP), 0.1);
@@ -297,68 +278,90 @@ export function createFrog(root: TgpuRoot) {
     getFrog,
     update(dt: number) {
       const {
-        body,
+        body: invBody,
         head,
         leftArm,
         leftForearm,
         rightArm,
         rightForearm,
-        leftThigh,
+        leftThigh: invLeftThigh,
         leftShin,
-        rightThigh,
+        rightThigh: invRightThigh,
         rightShin,
       } = frogRigCpu;
 
       progress += dt;
       headYaw = Math.cos(progress) * 0.1;
       headPitch = Math.sin(progress * 2) * 0.1;
-      bodyYaw = progress;
-      leftFootYaw = progress;
-      rightFootYaw = progress;
+      bodyYaw = Math.cos(progress * 1.5) * 0.5;
+      leftFootYaw = bodyYaw;
+      rightFootYaw = bodyYaw;
 
       const hipPos = d.vec3f(
-        Math.sin(progress * 1.5) * 0.6,
-        -1.3 + Math.sin(progress * 3) * 0.1,
+        -Math.sin(progress * 1.5) * 0.6,
+        1.3 - Math.sin(progress * 3) * 0.1,
         0,
       );
+      const invHipPos = std.neg(hipPos);
+      const chestPos = std.add(hipPos, d.vec3f(0, 1, 0));
 
       // All transformations are inverse, since it's actually the inverse
       // transformation matrix we're sending over to the GPU
       mat4.identity(head);
       mat4.rotateX(head, -headPitch, head);
       mat4.rotateY(head, -headYaw, head);
-      mat4.translate(head, hipPos, head);
+      mat4.translate(head, invHipPos, head);
 
       // BODY
-      mat4.identity(body);
-      mat4.rotateY(body, -bodyYaw, body);
+      mat4.identity(invBody);
+      mat4.rotateY(invBody, -bodyYaw, invBody);
+      mat4.translate(invBody, invHipPos, invBody);
+      const body = mat4.identity(d.mat4x4f());
       mat4.translate(body, hipPos, body);
+      mat4.rotateY(body, bodyYaw, body);
 
-      const leftArmLocalPos = d.vec3f(0.7, -1.25, 0);
+      const leftArmLocalPos = d.vec3f(-0.7, 1.25, 0);
       const leftArmGlobalPos = vec3.transformMat4(
         leftArmLocalPos,
         body,
         d.vec3f(),
       );
 
-      // Draw gizmos for left arm position
-      Gizmo.color(d.vec3f(1, 0, 0));
-      Gizmo.sphere(leftArmGlobalPos, 0.1);
-
-      const armPull = d.vec3f(Math.sin(bodyYaw), 0, Math.cos(bodyYaw));
-      const leftArmTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
-      const leftArmPoints = solveIK(armChain, leftArmTarget, armPull);
-      const leftArmMats = getRotationMatricesBetweenPoints(
-        leftArmPoints,
-        armPull,
+      const rightArmLocalPos = d.vec3f(0.7, 1.25, 0);
+      const rightArmGlobalPos = vec3.transformMat4(
+        rightArmLocalPos,
+        body,
+        d.vec3f(),
       );
 
-      const rightArmTarget = std.sub(d.vec3f(0, 0, 0), hipPos);
-      const rightArmPoints = solveIK(armChain, rightArmTarget, armPull);
-      const rightArmMats = getRotationMatricesBetweenPoints(
-        rightArmPoints,
-        armPull,
+      const leftLegLocalPos = d.vec3f(-0.3, 0, 0);
+      const leftLegGlobalPos = vec3.transformMat4(
+        leftLegLocalPos,
+        body,
+        d.vec3f(),
       );
+      const rightLegLocalPos = d.vec3f(0.3, 0, 0);
+      const rightLegGlobalPos = vec3.transformMat4(
+        rightLegLocalPos,
+        body,
+        d.vec3f(),
+      );
+
+      const hipDir = d.vec3f(Math.sin(bodyYaw), 0, Math.cos(bodyYaw));
+
+      // const leftArmTarget = std.sub(d.vec3f(0.2, 0, 0), leftArmGlobalPos);
+      // const leftArmPoints = solveIK(armChain, leftArmTarget, hipDir);
+      // const leftArmMats = getRotationMatricesBetweenPoints(
+      //   leftArmPoints,
+      //   hipDir,
+      // );
+
+      // const rightArmTarget = std.sub(d.vec3f(0, 0, 0), rightArmGlobalPos);
+      // const rightArmPoints = solveIK(armChain, rightArmTarget, hipDir);
+      // const rightArmMats = getRotationMatricesBetweenPoints(
+      //   rightArmPoints,
+      //   hipDir,
+      // );
 
       // LEFT ARM
       mat4.identity(leftArm);
@@ -368,9 +371,9 @@ export function createFrog(root: TgpuRoot) {
       // Undoing parent rotation
       mat4.rotateY(leftArm, bodyYaw, leftArm);
       // Lock into place
-      mat4.translate(leftArm, leftArmLocalPos, leftArm);
+      mat4.translate(leftArm, std.mul(leftArmLocalPos, -1), leftArm);
       // Parent transform
-      mat4.mul(leftArm, body, leftArm);
+      mat4.mul(leftArm, invBody, leftArm);
 
       // Left forearm
       mat4.identity(leftForearm);
@@ -388,7 +391,7 @@ export function createFrog(root: TgpuRoot) {
       // Lock into place
       mat4.translate(rightArm, d.vec3f(-0.7, -1.25, 0), rightArm);
       // Parent transform
-      mat4.mul(rightArm, body, rightArm);
+      mat4.mul(rightArm, invBody, rightArm);
 
       // Right forearm
       mat4.identity(rightForearm);
@@ -397,62 +400,129 @@ export function createFrog(root: TgpuRoot) {
       mat4.mul(rightForearm, rightArm, rightForearm);
 
       const leftLegPull = d.vec3f(
-        -Math.sin(leftFootYaw),
+        Math.sin(leftFootYaw),
         0,
-        -Math.cos(leftFootYaw),
+        Math.cos(leftFootYaw),
       );
-      const leftLegTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
-      const leftLegPoints = solveIK(legChain, leftLegTarget, leftLegPull);
+      const rightLegPull = d.vec3f(
+        Math.sin(rightFootYaw),
+        0,
+        Math.cos(rightFootYaw),
+      );
+
+      const leftLegTarget = d.vec3f(-0.6, 0, 0);
+      const rightLegTarget = d.vec3f(0.6, 0, 0);
+
+      const leftLegPoints = solveIK(
+        legChain,
+        std.sub(leftLegTarget, leftLegGlobalPos),
+        leftLegPull,
+      );
+      const rightLegPoints = solveIK(
+        legChain,
+        std.sub(rightLegTarget, rightLegGlobalPos),
+        rightLegPull,
+      );
+
       const leftLegMats = getRotationMatricesBetweenPoints(
         leftLegPoints,
         leftLegPull,
       );
-
-      const rightLegPull = d.vec3f(
-        -Math.sin(rightFootYaw),
-        0,
-        -Math.cos(rightFootYaw),
-      );
-      const rightLegTarget = std.sub(d.vec3f(0, 0, 0), hipPos);
-      const rightLegPoints = solveIK(legChain, rightLegTarget, rightLegPull);
       const rightLegMats = getRotationMatricesBetweenPoints(
         rightLegPoints,
         rightLegPull,
       );
 
-      // Left thigh
+      // LEFT THIGH (inv)
       const leftThighRot = leftLegMats[0];
       const leftThighInvRot = mat3.transpose(leftThighRot);
-      mat4.identity(leftThigh);
-      mat4.mul(leftThigh, mat4.fromMat3(leftThighInvRot), leftThigh);
-      mat4.translate(leftThigh, hipPos, leftThigh);
+      mat4.identity(invLeftThigh);
+      // Local transform
+      mat4.rotateX(invLeftThigh, Math.PI, invLeftThigh);
+      mat4.mul(invLeftThigh, mat4.fromMat3(leftThighInvRot), invLeftThigh);
+      // Undoing parent rotation
+      mat4.rotateY(invLeftThigh, bodyYaw, invLeftThigh);
+      // Lock into place
+      mat4.translate(invLeftThigh, std.mul(leftLegLocalPos, -1), invLeftThigh);
+      // Parent transform
+      mat4.mul(invLeftThigh, invBody, invLeftThigh);
+      // LEFT THIGH (normal)
+      const leftThigh = mat4.invert(invLeftThigh, d.mat4x4f());
 
       // Left shin
       const leftShinInvRot = mat3.transpose(leftLegMats[1]);
       mat4.identity(leftShin);
       // Local rotation
+      mat4.rotateX(leftShin, Math.PI, leftShin);
       mat4.mul(leftShin, mat4.fromMat3(leftShinInvRot), leftShin);
       // Undoing parent rotation
-      mat4.mul(leftShin, mat4.fromMat3(leftThighRot), leftShin);
-      mat4.translate(leftShin, d.vec3f(0, -0.8, 0), leftShin);
-      mat4.mul(leftShin, leftThigh, leftShin);
+      mat4.mul(leftShin, mat4.fromMat3(mat3.fromMat4(leftThigh)), leftShin);
+      // Lock into place
+      mat4.translate(leftShin, d.vec3f(0, -legChain[1], 0), leftShin);
+      // Parent transform
+      mat4.mul(leftShin, invLeftThigh, leftShin);
 
-      // Right thigh
+      // RIGHT THIGH (inv)
       const rightThighRot = rightLegMats[0];
-      const thighInvRot = mat3.transpose(rightThighRot);
-      mat4.identity(rightThigh);
-      mat4.mul(rightThigh, mat4.fromMat3(thighInvRot), rightThigh);
-      mat4.translate(rightThigh, hipPos, rightThigh);
+      const rightThighInvRot = mat3.transpose(rightThighRot);
+      mat4.identity(invRightThigh);
+      // Local transform
+      mat4.rotateX(invRightThigh, Math.PI, invRightThigh);
+      mat4.mul(invRightThigh, mat4.fromMat3(rightThighInvRot), invRightThigh);
+      // Undoing parent rotation
+      mat4.rotateY(invRightThigh, bodyYaw, invRightThigh);
+      // Lock into place
+      mat4.translate(invRightThigh, std.neg(rightLegLocalPos), invRightThigh);
+      // Parent transform
+      mat4.mul(invRightThigh, invBody, invRightThigh);
+      // RIGHT THIGH (normal)
+      const rightThigh = mat4.invert(invRightThigh, d.mat4x4f());
 
       // Right shin
       const rightShinInvRot = mat3.transpose(rightLegMats[1]);
       mat4.identity(rightShin);
       // Local rotation
+      mat4.rotateX(rightShin, Math.PI, rightShin);
       mat4.mul(rightShin, mat4.fromMat3(rightShinInvRot), rightShin);
       // Undoing parent rotation
-      mat4.mul(rightShin, mat4.fromMat3(rightThighRot), rightShin);
-      mat4.translate(rightShin, d.vec3f(0, -0.8, 0), rightShin);
-      mat4.mul(rightShin, rightThigh, rightShin);
+      mat4.mul(rightShin, mat4.fromMat3(mat3.fromMat4(rightThigh)), rightShin);
+      // Lock into place
+      mat4.translate(rightShin, d.vec3f(0, -legChain[1], 0), rightShin);
+      // Parent transform
+      mat4.mul(rightShin, invRightThigh, rightShin);
+
+      /**
+       *       // Left shin
+      const leftShinInvRot = mat3.transpose(leftLegMats[1]);
+      mat4.identity(leftShin);
+      // Local rotation
+      mat4.rotateX(leftShin, Math.PI, leftShin);
+      mat4.mul(leftShin, mat4.fromMat3(leftShinInvRot), leftShin);
+      // Undoing parent rotation
+      mat4.mul(leftShin, mat4.fromMat3(mat3.fromMat4(leftThigh)), leftShin);
+      // Lock into place
+      mat4.translate(leftShin, d.vec3f(0, -0.8, 0), leftShin);
+      // Parent transform
+      mat4.mul(leftShin, invLeftThigh, leftShin);
+
+       */
+
+      // Draw gizmo for joints
+      Gizmo.color(d.vec3f(1));
+      Gizmo.sphere(leftArmGlobalPos, 0.1);
+      Gizmo.sphere(rightArmGlobalPos, 0.1);
+      Gizmo.sphere(leftLegGlobalPos, 0.1);
+      Gizmo.sphere(rightLegGlobalPos, 0.1);
+
+      // Draw gizmos for IK targets
+      Gizmo.color(d.vec3f(0, 0, 1));
+      Gizmo.sphere(leftLegTarget, 0.1);
+      Gizmo.color(d.vec3f(0, 1, 0));
+      Gizmo.sphere(rightLegTarget, 0.1);
+
+      // Draw gizmo for body direction
+      Gizmo.color(d.vec3f(1, 0, 0));
+      Gizmo.arrow(chestPos, std.add(chestPos, hipDir));
     },
     uploadRig,
   };

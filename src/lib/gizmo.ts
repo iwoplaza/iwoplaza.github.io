@@ -3,6 +3,7 @@ import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
 import type { TgpuRoot } from 'typegpu';
 import { Shape } from './sdf.ts';
+import type { POV } from './camera.ts';
 
 const MAX_GIZMOS = 1024;
 
@@ -109,7 +110,10 @@ export const Gizmo = {
   },
 };
 
-export function createGizmoState(root: TgpuRoot): GizmoState {
+export function createGizmoState(
+  root: TgpuRoot,
+  pov: { $: d.InferGPU<typeof POV> },
+): GizmoState {
   const preferredFormat = navigator.gpu.getPreferredCanvasFormat();
   const spheres = Array.from({ length: MAX_GIZMOS }, () =>
     // TODO: Simplify when default constructor is available in TypeGPU
@@ -198,7 +202,7 @@ export function createGizmoState(root: TgpuRoot): GizmoState {
     // Check arrows
     for (let i = d.u32(0); i < arrowAmount.$; i++) {
       const arrow = arrowData.$[i];
-      const dist = sdArrow(p, arrow.start, arrow.end);
+      const dist = sdArrow(p, arrow.start, arrow.end) - arrow.stroke;
       if (dist < minDist) {
         minDist = dist;
         color = arrow.color;
@@ -248,15 +252,16 @@ export function createGizmoState(root: TgpuRoot): GizmoState {
   })((input) => {
     const uv = std.sub(std.mul(input.uv, 2), 1);
 
-    // Ray origin and direction
-    const ro = d.vec3f(0, 0, -5);
-    const rd = std.normalize(d.vec3f(uv.x, uv.y, 1));
+    // Ray origin and direction using camera matrices
+    const ro = std.mul(pov.$.invView, d.vec4f(0, 0, 0, 1)).xyz;
+    const rd = std.normalize(
+      std.mul(pov.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz,
+    );
 
     const march = rayMarch(ro, rd);
 
     if (march.dist >= 100) {
       std.discard();
-      return d.vec4f(0, 0, 0, 0);
     }
 
     return d.vec4f(march.color, 1);
