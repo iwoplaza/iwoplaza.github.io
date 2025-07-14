@@ -4,11 +4,13 @@ import { describe, expect, test } from 'vitest';
 import { extractAnglesBetweenPoints, solveIK } from '../src/lib/ik.ts';
 
 describe('solveIK', () => {
+  const pull = d.vec3f(0, 0, 1);
+
   test('IK approximates well for 2 equal-length links', () => {
     const chain = [1, 1];
     const target = d.vec3f(1, 1, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(3);
     // The last point should be AT the target
@@ -23,7 +25,7 @@ describe('solveIK', () => {
     const chain = [1, 1, 1];
     const target = d.vec3f(2, 1, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(chain.length + 1);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -33,7 +35,7 @@ describe('solveIK', () => {
     const chain = [1, 1, 1, 1];
     const target = d.vec3f(2, 2, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(chain.length + 1);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -43,7 +45,7 @@ describe('solveIK', () => {
     const chain = [1, 1, 1];
     const target = d.vec3f(2, 1, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     for (let i = 1; i < points.length; i++) {
       const segmentLength = distance(points[i], points[i - 1]);
@@ -55,7 +57,7 @@ describe('solveIK', () => {
     const chain = [1, 1];
     const target = d.vec3f(10, 10, 0); // Target too far to reach
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     // The starting point should still be at the origin
     expect(distance(points[0], d.vec3f())).toBeCloseTo(0, 4);
@@ -74,7 +76,7 @@ describe('solveIK', () => {
     const chain = [0.5, 2];
     const target = d.vec3f(1.5, 1, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(3);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -88,7 +90,7 @@ describe('solveIK', () => {
     const chain = [2, 0.5];
     const target = d.vec3f(1.5, 1, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(3);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -102,7 +104,7 @@ describe('solveIK', () => {
     const chain = [0.5, 1, 1.5];
     const target = d.vec3f(2, 1.5, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(4);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -117,7 +119,7 @@ describe('solveIK', () => {
     const chain = [2, 1, 0.5];
     const target = d.vec3f(2, 1.5, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(4);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -132,7 +134,7 @@ describe('solveIK', () => {
     const chain = [0.8, 1.5, 0.3, 1.2];
     const target = d.vec3f(2.5, 2, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(5);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -148,7 +150,7 @@ describe('solveIK', () => {
     const chain = [0.1, 2, 0.05, 1.5];
     const target = d.vec3f(2, 2, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(5);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -164,7 +166,7 @@ describe('solveIK', () => {
     const chain = [0.01, 3, 0.02];
     const target = d.vec3f(2.2, 2.2, 0);
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(4);
     expect(distance(points[points.length - 1], target)).toBeLessThan(0.1);
@@ -179,7 +181,7 @@ describe('solveIK', () => {
     const chain = [0.5, 1.5, 0.8];
     const target = d.vec3f(20, 20, 0); // Target too far to reach
 
-    const points = solveIK(chain, target);
+    const points = solveIK(chain, target, pull);
 
     expect(points.length).toBe(4);
 

@@ -160,8 +160,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       ),
     });
 
-    const sceneWithTree = shapeUnion(frogShape, tree);
-    return shapeUnion(sceneWithTree, floor);
+    let scene = floor;
+    scene = shapeUnion(scene, tree);
+    scene = shapeUnion(scene, frogShape);
+    return scene;
   });
 
   const createArray = tgpu.fn([], d.arrayOf(AABBHit, MAX_AABBS))`() {

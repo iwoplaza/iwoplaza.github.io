@@ -7,8 +7,7 @@ import { add, mul, normalize, sub } from 'typegpu/std';
  * @param chain
  * @param target
  */
-export function solveIK(chain: readonly number[], target: v3f) {
-  const pull = vec3f(0, 0, 1);
+export function solveIK(chain: readonly number[], target: v3f, pull: v3f) {
   const chainPoints: v3f[] = [vec3f()];
   const dir = normalize(target);
   let acc = vec3f();

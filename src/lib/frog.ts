@@ -347,12 +347,14 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(rightForearm, d.vec3f(0, -0.7, 0), rightForearm);
       mat4.mul(rightForearm, rightArm, rightForearm);
 
+      const leftPull = d.vec3f(0, 0, 1);
       const leftLegTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
-      const leftLegPoints = solveIK(legChain, leftLegTarget);
+      const leftLegPoints = solveIK(legChain, leftLegTarget, leftPull);
       const leftLegAngles = extractAnglesBetweenPoints(leftLegPoints);
 
+      const rightPull = d.vec3f(0, 0, 1);
       const rightLegTarget = std.sub(d.vec3f(-0.2, 0, 0), hipPos);
-      const rightLegPoints = solveIK(legChain, rightLegTarget);
+      const rightLegPoints = solveIK(legChain, rightLegTarget, rightPull);
       const rightLegAngles = extractAnglesBetweenPoints(rightLegPoints);
 
       // Left thigh
