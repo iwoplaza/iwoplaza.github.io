@@ -8,7 +8,7 @@ import {
 import tgpu, { type TgpuRoot } from 'typegpu';
 import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
-import { mat3, mat4 } from 'wgpu-matrix';
+import { mat3, mat4, vec3 } from 'wgpu-matrix';
 import { getRotationMatricesBetweenPoints, solveIK } from './ik.ts';
 import {
   opElongate,
@@ -290,6 +290,7 @@ export function createFrog(root: TgpuRoot) {
   });
 
   const legChain = [0.8, 0.8];
+  const armChain = [0.7, 0.7];
 
   return {
     getFrog,
@@ -332,6 +333,28 @@ export function createFrog(root: TgpuRoot) {
       mat4.rotateY(body, -bodyYaw, body);
       mat4.translate(body, hipPos, body);
 
+      const leftArmLocalPos = d.vec3f(0.7, -1.25, 0);
+      const leftArmGlobalPos = vec3.transformMat4(
+        leftArmLocalPos,
+        body,
+        d.vec3f(),
+      );
+
+      const armPull = d.vec3f(Math.sin(bodyYaw), 0, Math.cos(bodyYaw));
+      const leftArmTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
+      const leftArmPoints = solveIK(armChain, leftArmTarget, armPull);
+      const leftArmMats = getRotationMatricesBetweenPoints(
+        leftArmPoints,
+        armPull,
+      );
+
+      const rightArmTarget = std.sub(d.vec3f(0, 0, 0), hipPos);
+      const rightArmPoints = solveIK(armChain, rightArmTarget, armPull);
+      const rightArmMats = getRotationMatricesBetweenPoints(
+        rightArmPoints,
+        armPull,
+      );
+
       // LEFT ARM
       mat4.identity(leftArm);
       // Local transform
@@ -340,14 +363,14 @@ export function createFrog(root: TgpuRoot) {
       // Undoing parent rotation
       mat4.rotateY(leftArm, bodyYaw, leftArm);
       // Lock into place
-      mat4.translate(leftArm, d.vec3f(0.7, -1.25, 0), leftArm);
+      mat4.translate(leftArm, leftArmLocalPos, leftArm);
       // Parent transform
       mat4.mul(leftArm, body, leftArm);
 
       // Left forearm
       mat4.identity(leftForearm);
       mat4.rotateX(leftForearm, 0.4, leftForearm);
-      mat4.translate(leftForearm, d.vec3f(0, -0.7, 0), leftForearm);
+      mat4.translate(leftForearm, d.vec3f(0, -armChain[0], 0), leftForearm);
       mat4.mul(leftForearm, leftArm, leftForearm);
 
       // RIGHT ARM
@@ -368,28 +391,28 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(rightForearm, d.vec3f(0, -0.7, 0), rightForearm);
       mat4.mul(rightForearm, rightArm, rightForearm);
 
-      const leftPull = d.vec3f(
+      const leftLegPull = d.vec3f(
         -Math.sin(leftFootYaw),
         0,
         -Math.cos(leftFootYaw),
       );
       const leftLegTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
-      const leftLegPoints = solveIK(legChain, leftLegTarget, leftPull);
+      const leftLegPoints = solveIK(legChain, leftLegTarget, leftLegPull);
       const leftLegMats = getRotationMatricesBetweenPoints(
         leftLegPoints,
-        leftPull,
+        leftLegPull,
       );
 
-      const rightPull = d.vec3f(
+      const rightLegPull = d.vec3f(
         -Math.sin(rightFootYaw),
         0,
         -Math.cos(rightFootYaw),
       );
       const rightLegTarget = std.sub(d.vec3f(0, 0, 0), hipPos);
-      const rightLegPoints = solveIK(legChain, rightLegTarget, rightPull);
+      const rightLegPoints = solveIK(legChain, rightLegTarget, rightLegPull);
       const rightLegMats = getRotationMatricesBetweenPoints(
         rightLegPoints,
-        rightPull,
+        rightLegPull,
       );
 
       // Left thigh
