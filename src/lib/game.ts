@@ -161,7 +161,9 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     });
 
     let scene = floor;
-    scene = shapeUnion(scene, tree);
+    if (!INSPECT) {
+      scene = shapeUnion(scene, tree);
+    }
     scene = shapeUnion(scene, frogShape);
     return scene;
   });
@@ -349,11 +351,13 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       max: d.vec3f(100, 0, 100),
     });
 
-    // AABB for the infinite repeating trees
-    aabbs[2] = AABB({
-      min: d.vec3f(-100, 0, -100),
-      max: d.vec3f(100, 16, 100),
-    });
+    if (!INSPECT) {
+      // AABB for the infinite repeating trees
+      aabbs[2] = AABB({
+        min: d.vec3f(-100, 0, -100),
+        max: d.vec3f(100, 16, 100),
+      });
+    }
 
     // Update the uniforms
     sceneAABBs.write(aabbs);
