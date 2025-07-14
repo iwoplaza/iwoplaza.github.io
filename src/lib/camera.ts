@@ -18,7 +18,7 @@ export function createOrbitCamera(
   let prevX = 0;
   let prevY = 0;
 
-  const orbitOrigin = d.vec3f(0, 4, 0);
+  const orbitOrigin = d.vec3f(0, 3, 0);
   // Yaw and pitch angles facing the origin.
   let orbitRadius = options.radius;
   let orbitYaw = options.yaw;

@@ -284,7 +284,7 @@ export function createFrog(root: TgpuRoot) {
     return shapeUnion(skin, backpack);
   });
 
-  const legChain = [0.8, 0.8];
+  const legChain = [0.8, 1];
 
   return {
     getFrog,
@@ -303,10 +303,14 @@ export function createFrog(root: TgpuRoot) {
       } = frogRigCpu;
 
       progress += dt;
-      headYaw = Math.cos(progress);
-      headPitch = Math.sin(progress * 10) * 0.2;
+      headYaw = Math.cos(progress) * 0.1;
+      headPitch = Math.sin(progress * 2) * 0.1;
 
-      const hipPos = d.vec3f(0, -1.8 + Math.sin(progress * 2) * 0.2, 0);
+      const hipPos = d.vec3f(
+        Math.sin(progress * 1.5) * 0.1,
+        -1.3 + Math.sin(progress * 3) * 0.1,
+        0,
+      );
 
       // All transformations are inverse, since it's actually the inverse
       // transformation matrix we're sending over to the GPU
@@ -343,14 +347,18 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(rightForearm, d.vec3f(0, -0.7, 0), rightForearm);
       mat4.mul(rightForearm, rightArm, rightForearm);
 
-      const leftLegTarget = d.vec3f(-0.3, -hipPos.y, 0);
+      const leftLegTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
       const leftLegPoints = solveIK(legChain, leftLegTarget);
       const leftLegAngles = extractAnglesBetweenPoints(leftLegPoints);
 
+      const rightLegTarget = std.sub(d.vec3f(-0.2, 0, 0), hipPos);
+      const rightLegPoints = solveIK(legChain, rightLegTarget);
+      const rightLegAngles = extractAnglesBetweenPoints(rightLegPoints);
+
       // Left thigh
       mat4.identity(leftThigh);
-      mat4.rotateZ(leftThigh, leftLegAngles[0].y, leftThigh);
       mat4.rotateX(leftThigh, Math.PI + leftLegAngles[0].x, leftThigh);
+      mat4.rotateZ(leftThigh, leftLegAngles[0].y, leftThigh);
       mat4.translate(leftThigh, hipPos, leftThigh);
 
       // Left shin
@@ -359,29 +367,25 @@ export function createFrog(root: TgpuRoot) {
       mat4.rotateX(leftShin, -leftLegAngles[0].x, leftShin);
       mat4.rotateZ(leftShin, -leftLegAngles[0].y, leftShin);
       // Local rotation
-      mat4.rotateZ(leftShin, leftLegAngles[1].y, leftShin);
       mat4.rotateX(leftShin, leftLegAngles[1].x, leftShin);
+      mat4.rotateZ(leftShin, leftLegAngles[1].y, leftShin);
       mat4.translate(leftShin, d.vec3f(0, -0.8, 0), leftShin);
       mat4.mul(leftShin, leftThigh, leftShin);
 
-      const rightLegTarget = d.vec3f(0.3, -hipPos.y, 0);
-      const rightLegPoints = solveIK(legChain, rightLegTarget);
-      const rightLegAngles = extractAnglesBetweenPoints(rightLegPoints);
-
       // Right thigh
       mat4.identity(rightThigh);
-      mat4.rotateZ(rightThigh, -rightLegAngles[0].y, rightThigh);
       mat4.rotateX(rightThigh, Math.PI + rightLegAngles[0].x, rightThigh);
+      mat4.rotateZ(rightThigh, rightLegAngles[0].y, rightThigh);
       mat4.translate(rightThigh, hipPos, rightThigh);
 
       // Right shin
       mat4.identity(rightShin);
       // Undoing parent rotation
       mat4.rotateX(rightShin, -rightLegAngles[0].x, rightShin);
-      mat4.rotateZ(rightShin, rightLegAngles[0].y, rightShin);
+      mat4.rotateZ(rightShin, -rightLegAngles[0].y, rightShin);
       // Local rotation
-      mat4.rotateZ(rightShin, -rightLegAngles[1].y, rightShin);
       mat4.rotateX(rightShin, rightLegAngles[1].x, rightShin);
+      mat4.rotateZ(rightShin, rightLegAngles[1].y, rightShin);
       mat4.translate(rightShin, d.vec3f(0, -0.8, 0), rightShin);
       mat4.mul(rightShin, rightThigh, rightShin);
     },

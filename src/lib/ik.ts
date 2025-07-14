@@ -24,7 +24,7 @@ export function solveIK(chain: readonly number[], target: v3f) {
     chainPoints[chainPoints.length - 1] = target;
 
     // Pull the chain towards the target
-    for (let i = chainPoints.length - 2; i >= 0; i--) {
+    for (let i = chainPoints.length - 2; i >= 1; i--) {
       const curr = chainPoints[i];
       const segmentLength = chain[i];
 

@@ -57,11 +57,17 @@ describe('solveIK', () => {
 
     const points = solveIK(chain, target);
 
+    // The starting point should still be at the origin
+    expect(distance(points[0], d.vec3f())).toBeCloseTo(0, 4);
     expect(points.length).toBe(chain.length + 1);
     // Chain should stretch towards target
     const finalDir = normalize(sub(target, points[0]));
-    const endDir = normalize(sub(points[points.length - 1], points[0]));
-    expect(distance(finalDir, endDir)).toBeLessThan(0.1);
+    const dir10 = normalize(sub(points[1], points[0]));
+    const dir21 = normalize(sub(points[2], points[1]));
+    const dir20 = normalize(sub(points[2], points[0]));
+    expect(distance(finalDir, dir10)).toBeLessThan(0.1);
+    expect(distance(finalDir, dir21)).toBeLessThan(0.1);
+    expect(distance(finalDir, dir20)).toBeLessThan(0.1);
   });
 
   test('IK works with 2 different-length segments (short-long)', () => {
@@ -155,8 +161,8 @@ describe('solveIK', () => {
   });
 
   test('IK handles extreme length ratios', () => {
-    const chain = [0.01, 5, 0.02];
-    const target = d.vec3f(3, 3, 0);
+    const chain = [0.01, 3, 0.02];
+    const target = d.vec3f(2.2, 2.2, 0);
 
     const points = solveIK(chain, target);
 
@@ -165,7 +171,7 @@ describe('solveIK', () => {
 
     // Verify segment lengths are preserved despite extreme ratios
     expect(distance(points[0], points[1])).toBeCloseTo(0.01, 4);
-    expect(distance(points[1], points[2])).toBeCloseTo(5, 4);
+    expect(distance(points[1], points[2])).toBeCloseTo(3, 4);
     expect(distance(points[2], points[3])).toBeCloseTo(0.02, 4);
   });
 
@@ -344,15 +350,15 @@ describe('extractAnglesBetweenPoints', () => {
     expect(angles[1].y).toBeCloseTo(expectedAngle, 4);
   });
 
-  test('handles extreme angles near limits', () => {
+  test('handles extreme angles on limits', () => {
     const points = [
       d.vec3f(0, 0, 0),
-      d.vec3f(0, 0.1, 1), // Nearly vertical forward
+      d.vec3f(0, 0, 1), // Vertical
     ];
     const angles = extractAnglesBetweenPoints(points);
 
     // Should be close to maximum pitch (π/2) with minimal roll
-    expect(angles[0].x).toBeCloseTo(Math.asin(1 / Math.sqrt(1.01)), 4);
+    expect(angles[0].x).toBeCloseTo(Math.PI / 2, 4);
     expect(angles[0].y).toBeCloseTo(0, 4);
   });
 });
