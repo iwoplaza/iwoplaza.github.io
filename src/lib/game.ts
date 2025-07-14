@@ -379,6 +379,14 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     if (INSPECT) {
       gizmoState.enable();
     }
+    
+    // Oscillate frog position in a circle
+    const circleRadius = 3;
+    const circleSpeed = 0.5;
+    const frogX = Math.cos(timestamp * 0.001 * circleSpeed) * circleRadius;
+    const frogZ = Math.sin(timestamp * 0.001 * circleSpeed) * circleRadius;
+    frog.setPosition(frogX, frogZ);
+    
     frog.update(dt);
     frog.uploadRig();
     updateSceneAABBs();

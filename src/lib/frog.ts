@@ -219,6 +219,7 @@ export function createFrog(root: TgpuRoot) {
   let bodyYaw = 0;
   let leftFootYaw = 0;
   let rightFootYaw = 0;
+  let positionXZ = d.vec2f(0, 0);
   const body = new Bone(d.vec3f(), d.vec4f(), {});
   const head = new Bone(d.vec3f(0, 1.9, 0), d.vec4f(), { parent: body });
   const leftThigh = new Bone(d.vec3f(-0.3, 0, 0), d.vec4f(), { parent: body });
@@ -296,6 +297,10 @@ export function createFrog(root: TgpuRoot) {
 
   return {
     getFrog,
+    setPosition(x: number, z: number) {
+      positionXZ[0] = x;
+      positionXZ[1] = z;
+    },
     update(dt: number) {
       progress += dt;
       headYaw = Math.cos(progress) * 0.1;
@@ -305,9 +310,9 @@ export function createFrog(root: TgpuRoot) {
       rightFootYaw = bodyYaw;
 
       // BODY
-      body.pos.x = -Math.sin(progress * 1.5) * 0.6;
+      body.pos.x = positionXZ[0] - Math.sin(progress * 1.5) * 0.6;
       body.pos.y = 1.3 - Math.sin(progress * 3) * 0.1;
-      body.pos.z = 0;
+      body.pos.z = positionXZ[1];
       const chestPos = std.add(body.pos, d.vec3f(0, 1, 0));
 
       quatn.fromEuler(0, bodyYaw, 0, 'yxz', body.rot);
