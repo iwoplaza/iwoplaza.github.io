@@ -16,7 +16,7 @@ import {
   sortHits,
 } from './sdf.ts';
 
-const INSPECT = true;
+const INSPECT = false;
 const pixelation = INSPECT ? 1 : 4;
 const gameCameraOptions = {
   radius: 6,

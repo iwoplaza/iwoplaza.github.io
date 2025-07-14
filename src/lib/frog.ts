@@ -217,6 +217,9 @@ export function createFrog(root: TgpuRoot) {
   let progress = 0;
   let headPitch = 0;
   let headYaw = 0;
+  let bodyYaw = 0;
+  let leftFootYaw = 0;
+  let rightFootYaw = 0;
   const frogRigCpu = FrogRig({
     head: mat4.identity(d.mat4x4f()),
     body: mat4.identity(d.mat4x4f()),
@@ -246,23 +249,11 @@ export function createFrog(root: TgpuRoot) {
     const bp = std.sub(p, bodyOrigin);
     const tbp = std.mul(frogRig.$.body, d.vec4f(bp, 1)).xyz;
 
-    const leftArmOrigin = d.vec3f(-0.7, 1.25, 0);
-    const leftArmP = std.sub(p, leftArmOrigin);
-    const leftArmTP = std.mul(frogRig.$.leftArm, d.vec4f(leftArmP, 1)).xyz;
+    const leftArmTP = std.mul(frogRig.$.leftArm, d.vec4f(p, 1)).xyz;
+    const leftForearmTP = std.mul(frogRig.$.leftForearm, d.vec4f(p, 1)).xyz;
 
-    const leftForearmTP = std.mul(
-      frogRig.$.leftForearm,
-      d.vec4f(leftArmP, 1),
-    ).xyz;
-
-    const rightArmOrigin = d.vec3f(0.7, 1.25, 0);
-    const rightArmP = std.sub(p, rightArmOrigin);
-    const rightArmTP = std.mul(frogRig.$.rightArm, d.vec4f(rightArmP, 1)).xyz;
-
-    const rightForearmTP = std.mul(
-      frogRig.$.rightForearm,
-      d.vec4f(rightArmP, 1),
-    ).xyz;
+    const rightArmTP = std.mul(frogRig.$.rightArm, d.vec4f(p, 1)).xyz;
+    const rightForearmTP = std.mul(frogRig.$.rightForearm, d.vec4f(p, 1)).xyz;
 
     const leftThighOrigin = d.vec3f(-0.3, 0, 0);
     const leftThighP = std.sub(p, leftThighOrigin);
@@ -298,7 +289,7 @@ export function createFrog(root: TgpuRoot) {
     return shapeUnion(skin, backpack);
   });
 
-  const legChain = [0.8, 1];
+  const legChain = [0.8, 0.8];
 
   return {
     getFrog,
@@ -319,6 +310,9 @@ export function createFrog(root: TgpuRoot) {
       progress += dt;
       headYaw = Math.cos(progress) * 0.1;
       headPitch = Math.sin(progress * 2) * 0.1;
+      bodyYaw = progress;
+      leftFootYaw = progress;
+      rightFootYaw = progress;
 
       const hipPos = d.vec3f(
         Math.sin(progress * 1.5) * 0.6,
@@ -333,15 +327,22 @@ export function createFrog(root: TgpuRoot) {
       mat4.rotateY(head, -headYaw, head);
       mat4.translate(head, hipPos, head);
 
-      // Body
+      // BODY
       mat4.identity(body);
+      mat4.rotateY(body, -bodyYaw, body);
       mat4.translate(body, hipPos, body);
 
-      // Left arm
+      // LEFT ARM
       mat4.identity(leftArm);
+      // Local transform
       mat4.rotateZ(leftArm, -0.3 + Math.sin(progress) * 0.1, leftArm);
       mat4.rotateX(leftArm, Math.PI - 0.2, leftArm);
-      mat4.translate(leftArm, hipPos, leftArm);
+      // Undoing parent rotation
+      mat4.rotateY(leftArm, bodyYaw, leftArm);
+      // Lock into place
+      mat4.translate(leftArm, d.vec3f(0.7, -1.25, 0), leftArm);
+      // Parent transform
+      mat4.mul(leftArm, body, leftArm);
 
       // Left forearm
       mat4.identity(leftForearm);
@@ -349,11 +350,17 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(leftForearm, d.vec3f(0, -0.7, 0), leftForearm);
       mat4.mul(leftForearm, leftArm, leftForearm);
 
-      // Right arm
+      // RIGHT ARM
       mat4.identity(rightArm);
+      // Local transform
       mat4.rotateZ(rightArm, 0.3 - Math.sin(progress) * 0.1, rightArm);
       mat4.rotateX(rightArm, Math.PI - 0.2, rightArm);
-      mat4.translate(rightArm, hipPos, rightArm);
+      // Undoing parent rotation
+      mat4.rotateY(rightArm, bodyYaw, rightArm);
+      // Lock into place
+      mat4.translate(rightArm, d.vec3f(-0.7, -1.25, 0), rightArm);
+      // Parent transform
+      mat4.mul(rightArm, body, rightArm);
 
       // Right forearm
       mat4.identity(rightForearm);
@@ -361,8 +368,11 @@ export function createFrog(root: TgpuRoot) {
       mat4.translate(rightForearm, d.vec3f(0, -0.7, 0), rightForearm);
       mat4.mul(rightForearm, rightArm, rightForearm);
 
-      // const leftPull = d.vec3f(Math.sin(leftFootYaw), 0, Math.cos(leftFootYaw));
-      const leftPull = d.vec3f(0, 0, -1);
+      const leftPull = d.vec3f(
+        -Math.sin(leftFootYaw),
+        0,
+        -Math.cos(leftFootYaw),
+      );
       const leftLegTarget = std.sub(d.vec3f(0.2, 0, 0), hipPos);
       const leftLegPoints = solveIK(legChain, leftLegTarget, leftPull);
       const leftLegMats = getRotationMatricesBetweenPoints(
@@ -370,12 +380,11 @@ export function createFrog(root: TgpuRoot) {
         leftPull,
       );
 
-      // const rightPull = d.vec3f(
-      //   Math.sin(rightFootYaw),
-      //   0,
-      //   Math.cos(rightFootYaw),
-      // );
-      const rightPull = d.vec3f(0, 0, -1);
+      const rightPull = d.vec3f(
+        -Math.sin(rightFootYaw),
+        0,
+        -Math.cos(rightFootYaw),
+      );
       const rightLegTarget = std.sub(d.vec3f(0, 0, 0), hipPos);
       const rightLegPoints = solveIK(legChain, rightLegTarget, rightPull);
       const rightLegMats = getRotationMatricesBetweenPoints(
