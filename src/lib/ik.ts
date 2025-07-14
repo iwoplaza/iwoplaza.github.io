@@ -1,5 +1,12 @@
-import { type v2f, type v3f, vec2f, vec3f } from 'typegpu/data';
-import { add, mul, normalize, sub } from 'typegpu/std';
+import {
+  type m3x3f,
+  mat3x3f,
+  type v2f,
+  type v3f,
+  vec2f,
+  vec3f,
+} from 'typegpu/data';
+import { add, cross, mul, normalize, sub } from 'typegpu/std';
 
 /**
  * Origin of the chain is assumed to be (0, 0, 0)
@@ -60,4 +67,24 @@ export function extractAnglesBetweenPoints(points: readonly v3f[]): v2f[] {
   }
 
   return angles;
+}
+
+export function getRotationMatricesBetweenPoints(
+  points: readonly v3f[],
+  forward: v3f,
+): m3x3f[] {
+  const matrices: m3x3f[] = [];
+
+  for (let i = 0; i < points.length - 1; ++i) {
+    const curr = points[i];
+    const next = points[i + 1];
+    const yAxis = normalize(sub(curr, next));
+    const xAxis = normalize(cross(yAxis, forward));
+    const zAxis = normalize(cross(xAxis, yAxis));
+
+    const mat = mat3x3f(xAxis, yAxis, zAxis);
+    matrices.push(mat);
+  }
+
+  return matrices;
 }

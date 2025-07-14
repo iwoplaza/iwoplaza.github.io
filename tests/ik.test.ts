@@ -1,7 +1,11 @@
 import * as d from 'typegpu/data';
 import { distance, normalize, sub } from 'typegpu/std';
 import { describe, expect, test } from 'vitest';
-import { extractAnglesBetweenPoints, solveIK } from '../src/lib/ik.ts';
+import {
+  extractAnglesBetweenPoints,
+  getRotationMatricesBetweenPoints,
+  solveIK,
+} from '../src/lib/ik.ts';
 
 describe('solveIK', () => {
   const pull = d.vec3f(0, 0, 1);
@@ -362,5 +366,16 @@ describe('extractAnglesBetweenPoints', () => {
     // Should be close to maximum pitch (π/2) with minimal roll
     expect(angles[0].x).toBeCloseTo(Math.PI / 2, 4);
     expect(angles[0].y).toBeCloseTo(0, 4);
+  });
+});
+
+describe('getRotationMatricesBetweenPoints', () => {
+  test('identity for points going straight down', () => {
+    const points = [d.vec3f(), d.vec3f(0, -1, 0)];
+    const forward = d.vec3f(0, 0, 1);
+    const matrices = getRotationMatricesBetweenPoints(points, forward);
+    expect(matrices).toStrictEqual([
+      d.mat3x3f(d.vec3f(1, 0, 0), d.vec3f(0, 1, 0), d.vec3f(0, 0, 1)),
+    ]);
   });
 });
