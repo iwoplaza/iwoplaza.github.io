@@ -70,9 +70,21 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       // Convert to joystick input (-1 to 1 range)
       const sensitivity = 0.01;
       
-      // Store raw input in -1 to 1 range (camera alignment will be done in run())
-      touchInput.x = Math.max(-1, Math.min(1, deltaX * sensitivity));
-      touchInput.z = Math.max(-1, Math.min(1, deltaY * sensitivity));
+      // Calculate raw input values
+      const rawX = deltaX * sensitivity;
+      const rawZ = deltaY * sensitivity;
+      
+      // Calculate magnitude of the input vector
+      const magnitude = Math.sqrt(rawX * rawX + rawZ * rawZ);
+      
+      // Normalize if magnitude exceeds 1 to ensure consistent max speed in all directions
+      if (magnitude > 1) {
+        touchInput.x = rawX / magnitude;
+        touchInput.z = rawZ / magnitude;
+      } else {
+        touchInput.x = rawX;
+        touchInput.z = rawZ;
+      }
     }
   });
 
@@ -111,9 +123,21 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       // Convert to joystick input (-1 to 1 range)
       const sensitivity = 0.01;
       
-      // Store raw input in -1 to 1 range (camera alignment will be done in run())
-      touchInput.x = Math.max(-1, Math.min(1, deltaX * sensitivity));
-      touchInput.z = Math.max(-1, Math.min(1, deltaY * sensitivity));
+      // Calculate raw input values
+      const rawX = deltaX * sensitivity;
+      const rawZ = deltaY * sensitivity;
+      
+      // Calculate magnitude of the input vector
+      const magnitude = Math.sqrt(rawX * rawX + rawZ * rawZ);
+      
+      // Normalize if magnitude exceeds 1 to ensure consistent max speed in all directions
+      if (magnitude > 1) {
+        touchInput.x = rawX / magnitude;
+        touchInput.z = rawZ / magnitude;
+      } else {
+        touchInput.x = rawX;
+        touchInput.z = rawZ;
+      }
     }
   });
 
