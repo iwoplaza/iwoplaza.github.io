@@ -246,6 +246,7 @@ export function createFrog(root: TgpuRoot) {
   let targetHeadYaw = 0;
   let bodyYaw = 0;
   let bodyPitch = 0;
+  let bodyRoll = 0;
   let leftFootYaw = 0;
   let rightFootYaw = 0;
   const rootPos = d.vec3f();
@@ -348,7 +349,9 @@ export function createFrog(root: TgpuRoot) {
       // When moving faster, the arms should swing more rapidly
       // When stationary, they should still have a subtle movement
       const velocityPhaseBoost =
-        BASE_ARM_ANIMATION_SPEED + moveMagnitude * ARM_ANIMATION_SPEED;
+        BASE_ARM_ANIMATION_SPEED +
+        moveMagnitude * ARM_ANIMATION_SPEED +
+        Math.abs(bodyRoll) ** 2 * 10;
       armAnimationPhase += velocityPhaseBoost * dt;
 
       // Keep the phase within a reasonable range to avoid floating point issues
@@ -382,8 +385,17 @@ export function createFrog(root: TgpuRoot) {
       } else {
         // When not moving, return to a natural idle animation
         headPitch = Math.sin(progress * 2) * 0.1;
-        bodyPitch = 0;
       }
+
+      // Smoothly rotate head toward target direction
+      const headBodyYawDiff = targetHeadYaw - bodyYaw;
+
+      // Normalize the angle difference to be between -PI and PI
+      const normHeadHeadYawDiff = Math.atan2(
+        Math.sin(headBodyYawDiff),
+        Math.cos(headBodyYawDiff),
+      );
+      bodyRoll = -normHeadHeadYawDiff * 0.2;
 
       // Smoothly rotate head toward target direction
       const headYawDiff = targetHeadYaw - headYaw;
@@ -434,7 +446,7 @@ export function createFrog(root: TgpuRoot) {
       body.pos.z = rootPos.z;
       const chestPos = std.add(body.pos, d.vec3f(0, 1, 0));
 
-      quatn.fromEuler(bodyPitch, bodyYaw, 0, 'yxz', body.rot);
+      quatn.fromEuler(bodyPitch, bodyYaw, bodyRoll, 'yxz', body.rot);
       body.compute();
 
       const hipDir = d.vec3f(Math.sin(rootYaw), 0, Math.cos(rootYaw));
