@@ -212,6 +212,15 @@ export const FrogRig = d.struct({
 export function createFrog(root: TgpuRoot) {
   const legChain = [0.8, 0.8];
   const armChain = [0.7, 0.7];
+  
+  // IK target positions
+  const leftArmTarget = d.vec3f(-1.8, 2, 1);
+  const rightArmTarget = d.vec3f(1.8, 2, 1);
+  const leftLegTarget = d.vec3f(-0.6, 0, 0);
+  const rightLegTarget = d.vec3f(0.6, 0, 0);
+  
+  // Maximum distance a target can be from the body before resetting
+  const MAX_TARGET_DISTANCE = 2.0;
 
   let progress = 0;
   let headPitch = 0;
@@ -341,9 +350,30 @@ export function createFrog(root: TgpuRoot) {
         body.mat,
         d.vec3f(),
       );
-
-      const leftArmTarget = d.vec3f(-1.8, 2, 1);
-      const rightArmTarget = d.vec3f(1.8, 2, 1);
+      
+      // Check if arm targets are too far from body and reset if needed
+      const bodyGlobalPos = vec3.transformMat4(
+        d.vec3f(0, 0, 0),
+        body.mat,
+        d.vec3f(),
+      );
+      
+      // Calculate distance from body to arm targets
+      const leftArmTargetDist = vec3.distance(leftArmTarget, bodyGlobalPos);
+      const rightArmTargetDist = vec3.distance(rightArmTarget, bodyGlobalPos);
+      
+      // Reset arm targets if they're too far from the body
+      if (leftArmTargetDist > MAX_TARGET_DISTANCE) {
+        leftArmTarget.x = bodyGlobalPos.x - 1.0;
+        leftArmTarget.y = bodyGlobalPos.y + 1.0;
+        leftArmTarget.z = bodyGlobalPos.z + 0.5;
+      }
+      
+      if (rightArmTargetDist > MAX_TARGET_DISTANCE) {
+        rightArmTarget.x = bodyGlobalPos.x + 1.0;
+        rightArmTarget.y = bodyGlobalPos.y + 1.0;
+        rightArmTarget.z = bodyGlobalPos.z + 0.5;
+      }
 
       const leftArmPoints = solveIK(
         armChain,
@@ -407,9 +437,23 @@ export function createFrog(root: TgpuRoot) {
         0,
         Math.cos(rightFootYaw),
       );
-
-      const leftLegTarget = d.vec3f(-0.6, 0, 0);
-      const rightLegTarget = d.vec3f(0.6, 0, 0);
+      
+      // Calculate distance from body to leg targets
+      const leftLegTargetDist = vec3.distance(leftLegTarget, bodyGlobalPos);
+      const rightLegTargetDist = vec3.distance(rightLegTarget, bodyGlobalPos);
+      
+      // Reset leg targets if they're too far from the body
+      if (leftLegTargetDist > MAX_TARGET_DISTANCE) {
+        leftLegTarget.x = bodyGlobalPos.x - 0.6;
+        leftLegTarget.y = bodyGlobalPos.y - 1.0;
+        leftLegTarget.z = bodyGlobalPos.z;
+      }
+      
+      if (rightLegTargetDist > MAX_TARGET_DISTANCE) {
+        rightLegTarget.x = bodyGlobalPos.x + 0.6;
+        rightLegTarget.y = bodyGlobalPos.y - 1.0;
+        rightLegTarget.z = bodyGlobalPos.z;
+      }
 
       const leftLegPoints = solveIK(
         legChain,
