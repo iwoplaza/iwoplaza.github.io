@@ -225,11 +225,12 @@ export function createFrog(root: TgpuRoot) {
   // Movement tracking for rotation
   const prevRootPos = d.vec3f();
   const movementDirection = d.vec3f(0, 0, 1); // Default forward direction
+  const velocity = d.vec3f(); // Current velocity
 
   // Rotation parameters
   const HEAD_ROTATION_SPEED = 8.0; // How quickly the head turns to face movement
   const BODY_ROTATION_SPEED = 7; // How quickly the body follows the head (slower for follow-through)
-  const MIN_MOVEMENT_THRESHOLD = 0.01; // Minimum movement required to change direction
+  const MIN_MOVEMENT_THRESHOLD = 0.001; // Minimum movement required to change direction
 
   // Arm animation parameters
   const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
@@ -337,8 +338,22 @@ export function createFrog(root: TgpuRoot) {
       rootPos.y = v.y;
       rootPos.z = v.z;
     },
+    get velocity() {
+      return velocity;
+    },
+    set velocity(v: d.v3f) {
+      velocity.x = v.x;
+      velocity.y = v.y;
+      velocity.z = v.z;
+    },
     update(dt: number) {
       progress += dt;
+      
+      // Apply velocity to position
+      rootPos.x += velocity.x * dt;
+      rootPos.y += velocity.y * dt;
+      rootPos.z += velocity.z * dt;
+      
       // Calculate movement direction
       const moveX = rootPos.x - prevRootPos.x;
       const moveZ = rootPos.z - prevRootPos.z;

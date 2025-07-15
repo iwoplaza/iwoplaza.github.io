@@ -501,7 +501,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       frog.position = d.vec3f(frogX, 0, frogZ);
     } else {
       // In game mode, use touch/mouse input
-      const moveSpeed = 8 * dt; // Scale by delta time for frame-rate independent movement
+      const moveSpeed = 8; // Movement speed units per second
 
       // Apply camera rotation to the raw touch input
       const cameraYaw = camera.orbitYaw;
@@ -512,16 +512,11 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       const alignedX = touchInput.x * cameraCos - touchInput.z * cameraSin;
       const alignedZ = touchInput.x * cameraSin + touchInput.z * cameraCos;
 
-      // Calculate movement offset
-      const offsetX = alignedX * moveSpeed;
-      const offsetZ = alignedZ * moveSpeed;
-
-      // Offset the frog's position instead of setting it directly
-      const currentPos = frog.position;
-      frog.position = d.vec3f(
-        currentPos.x + offsetX,
-        currentPos.y,
-        currentPos.z + offsetZ,
+      // Set velocity based on input
+      frog.velocity = d.vec3f(
+        alignedX * moveSpeed,
+        0,
+        alignedZ * moveSpeed,
       );
     }
 
