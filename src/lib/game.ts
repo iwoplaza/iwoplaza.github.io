@@ -39,90 +39,103 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     canvas,
     INSPECT ? inspectCameraOptions : gameCameraOptions,
   );
+  camera.active = INSPECT;
 
   // Touch input for frog movement (when not in INSPECT mode)
-  let touchInput = { x: 0, z: 0 };
+  const touchInput = { x: 0, z: 0 };
   let isTouchActive = false;
 
-  if (!INSPECT) {
-    // Override touch controls for frog movement
-    let touchStartX = 0;
-    let touchStartY = 0;
-    
-    canvas.addEventListener('touchstart', (event: TouchEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.touches.length === 1) {
-        isTouchActive = true;
-        touchStartX = event.touches[0].clientX;
-        touchStartY = event.touches[0].clientY;
-      }
-    }, { capture: true });
+  // Touch controls for frog movement
+  let touchStartX = 0;
+  let touchStartY = 0;
 
-    canvas.addEventListener('touchmove', (event: TouchEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (isTouchActive && event.touches.length === 1) {
-        const touch = event.touches[0];
-        const deltaX = touch.clientX - touchStartX;
-        const deltaY = touch.clientY - touchStartY;
-        
-        // Convert to joystick input (-1 to 1 range)
-        const sensitivity = 0.01;
-        touchInput.x = Math.max(-1, Math.min(1, deltaX * sensitivity));
-        touchInput.z = Math.max(-1, Math.min(1, deltaY * sensitivity));
-      }
-    }, { capture: true });
+  canvas.addEventListener('touchstart', (event: TouchEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!INSPECT && event.touches.length === 1) {
+      isTouchActive = true;
+      touchStartX = event.touches[0].clientX;
+      touchStartY = event.touches[0].clientY;
+    }
+  });
 
-    canvas.addEventListener('touchend', (event: TouchEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.touches.length === 0) {
-        isTouchActive = false;
-        touchInput.x = 0;
-        touchInput.z = 0;
-      }
-    }, { capture: true });
+  canvas.addEventListener('touchmove', (event: TouchEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!INSPECT && isTouchActive && event.touches.length === 1) {
+      const touch = event.touches[0];
+      const deltaX = -touch.clientX + touchStartX;
+      const deltaY = touch.clientY - touchStartY;
 
-    // Mouse controls for desktop
-    let isMouseDown = false;
-    let mouseStartX = 0;
-    let mouseStartY = 0;
+      // Convert to joystick input (-1 to 1 range)
+      const sensitivity = 0.01;
+      const cameraYaw = camera.orbitYaw;
+      const cameraCos = Math.cos(cameraYaw);
+      const cameraSin = Math.sin(cameraYaw);
 
-    canvas.addEventListener('mousedown', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.button === 0) {
-        isMouseDown = true;
-        mouseStartX = event.clientX;
-        mouseStartY = event.clientY;
-      }
-    }, { capture: true });
+      // Calculate input relative to camera orientation
+      const rawX = Math.max(-1, Math.min(1, deltaX * sensitivity));
+      const rawZ = Math.max(-1, Math.min(1, deltaY * sensitivity));
+      touchInput.x = rawX * cameraCos - rawZ * cameraSin;
+      touchInput.z = rawX * cameraSin + rawZ * cameraCos;
+    }
+  });
 
-    canvas.addEventListener('mousemove', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (isMouseDown) {
-        const deltaX = event.clientX - mouseStartX;
-        const deltaY = event.clientY - mouseStartY;
-        
-        // Convert to joystick input (-1 to 1 range)
-        const sensitivity = 0.01;
-        touchInput.x = Math.max(-1, Math.min(1, deltaX * sensitivity));
-        touchInput.z = Math.max(-1, Math.min(1, deltaY * sensitivity));
-      }
-    }, { capture: true });
+  canvas.addEventListener('touchend', (event: TouchEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!INSPECT && event.touches.length === 0) {
+      isTouchActive = false;
+      touchInput.x = 0;
+      touchInput.z = 0;
+    }
+  });
 
-    canvas.addEventListener('mouseup', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.button === 0) {
-        isMouseDown = false;
-        touchInput.x = 0;
-        touchInput.z = 0;
-      }
-    }, { capture: true });
-  }
+  // Mouse controls for desktop
+  let isMouseDown = false;
+  let mouseStartX = 0;
+  let mouseStartY = 0;
+
+  canvas.addEventListener('mousedown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!INSPECT && event.button === 0) {
+      isMouseDown = true;
+      mouseStartX = event.clientX;
+      mouseStartY = event.clientY;
+    }
+  });
+
+  canvas.addEventListener('mousemove', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!INSPECT && isMouseDown) {
+      const deltaX = -event.clientX + mouseStartX;
+      const deltaY = event.clientY - mouseStartY;
+
+      // Convert to joystick input (-1 to 1 range)
+      const sensitivity = 0.01;
+      const cameraYaw = camera.orbitYaw;
+      const cameraCos = Math.cos(cameraYaw);
+      const cameraSin = Math.sin(cameraYaw);
+
+      // Calculate input relative to camera orientation
+      const rawX = Math.max(-1, Math.min(1, deltaX * sensitivity));
+      const rawZ = Math.max(-1, Math.min(1, deltaY * sensitivity));
+      touchInput.x = rawX * cameraCos - rawZ * cameraSin;
+      touchInput.z = rawX * cameraSin + rawZ * cameraCos;
+    }
+  });
+
+  canvas.addEventListener('mouseup', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!INSPECT && event.button === 0) {
+      isMouseDown = false;
+      touchInput.x = 0;
+      touchInput.z = 0;
+    }
+  });
 
   // Create uniform for AABBs
   const sceneAABBs = root.createUniform(d.arrayOf(AABB, MAX_AABBS));
@@ -463,7 +476,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     if (INSPECT) {
       gizmoState.enable();
     }
-    
+
     // Update frog position based on input
     if (INSPECT) {
       // In inspect mode, keep the circular motion
@@ -471,15 +484,15 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       const circleSpeed = 0.5;
       const frogX = Math.cos(timestamp * 0.001 * circleSpeed) * circleRadius;
       const frogZ = Math.sin(timestamp * 0.001 * circleSpeed) * circleRadius;
-      frog.setPosition(frogX, frogZ);
+      frog.position = d.vec3f(frogX, 0, frogZ);
     } else {
       // In game mode, use touch/mouse input
       const moveSpeed = 5;
       const frogX = touchInput.x * moveSpeed;
       const frogZ = touchInput.z * moveSpeed;
-      frog.setPosition(frogX, frogZ);
+      frog.position = d.vec3f(frogX, 0, frogZ);
     }
-    
+
     frog.update(dt);
     frog.uploadRig();
     updateSceneAABBs();

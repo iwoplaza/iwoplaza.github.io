@@ -19,6 +19,7 @@ export function createOrbitCamera(
   touchSurface: HTMLElement,
   options: OrbitOptions,
 ) {
+  let active = true;
   let isDragging = false;
   let prevX = 0;
   let prevY = 0;
@@ -64,6 +65,9 @@ export function createOrbitCamera(
   updateOrbit(0, 0);
 
   touchSurface.addEventListener('wheel', (event: WheelEvent) => {
+    if (!active) {
+      return;
+    }
     event.preventDefault();
     const zoomSensitivity = 0.005;
     orbitRadius = Math.max(1, orbitRadius + event.deltaY * zoomSensitivity);
@@ -71,6 +75,9 @@ export function createOrbitCamera(
   });
 
   touchSurface.addEventListener('mousedown', (event) => {
+    if (!active) {
+      return;
+    }
     if (event.button === 0) {
       // Left Mouse Button controls Camera Orbit.
       isDragging = true;
@@ -84,6 +91,9 @@ export function createOrbitCamera(
   });
 
   touchSurface.addEventListener('mousemove', (event) => {
+    if (!active) {
+      return;
+    }
     const dx = event.clientX - prevX;
     const dy = event.clientY - prevY;
     prevX = event.clientX;
@@ -96,6 +106,10 @@ export function createOrbitCamera(
 
   // Mobile touch support.
   touchSurface.addEventListener('touchstart', (event: TouchEvent) => {
+    if (!active) {
+      return;
+    }
+
     event.preventDefault();
     if (event.touches.length === 1) {
       // Single touch controls Camera Orbit.
@@ -107,6 +121,10 @@ export function createOrbitCamera(
   });
 
   touchSurface.addEventListener('touchmove', (event: TouchEvent) => {
+    if (!active) {
+      return;
+    }
+
     event.preventDefault();
     const touch = event.touches[0];
     const dx = touch.clientX - prevX;
@@ -127,6 +145,21 @@ export function createOrbitCamera(
   });
 
   return {
+    get active() {
+      return active;
+    },
+    set active(v: boolean) {
+      active = v;
+    },
+    get orbitRadius() {
+      return orbitRadius;
+    },
+    get orbitYaw() {
+      return orbitYaw;
+    },
+    get orbitPitch() {
+      return orbitPitch;
+    },
     pov,
     updateProjection(width: number, height: number) {
       const aspect = width / height;
