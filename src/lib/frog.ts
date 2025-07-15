@@ -222,10 +222,21 @@ export function createFrog(root: TgpuRoot) {
   // Maximum distance a target can be from the body before resetting
   const MAX_TARGET_DISTANCE = 2.0;
 
+  // Movement tracking for rotation
+  const prevRootPos = d.vec3f();
+  const movementDirection = d.vec3f(0, 0, 1); // Default forward direction
+  
+  // Rotation parameters
+  const HEAD_ROTATION_SPEED = 8.0;  // How quickly the head turns to face movement
+  const BODY_ROTATION_SPEED = 2.5;  // How quickly the body follows the head (slower for follow-through)
+  const MIN_MOVEMENT_THRESHOLD = 0.01; // Minimum movement required to change direction
+  
   let progress = 0;
   let headPitch = 0;
   let headYaw = 0;
+  let targetHeadYaw = 0;
   let bodyYaw = 0;
+  let targetBodyYaw = 0;
   let leftFootYaw = 0;
   let rightFootYaw = 0;
   const rootPos = d.vec3f();
@@ -316,11 +327,56 @@ export function createFrog(root: TgpuRoot) {
     },
     update(dt: number) {
       progress += dt;
-      headYaw = Math.cos(progress) * 0.1;
-      headPitch = Math.sin(progress * 2) * 0.1;
-      bodyYaw = Math.cos(progress * 1.5) * 0.5;
+      
+      // Calculate movement direction
+      const moveX = rootPos.x - prevRootPos.x;
+      const moveZ = rootPos.z - prevRootPos.z;
+      const moveMagnitude = Math.sqrt(moveX * moveX + moveZ * moveZ);
+      
+      // Update movement direction if there is significant movement
+      if (moveMagnitude > MIN_MOVEMENT_THRESHOLD) {
+        movementDirection.x = moveX / moveMagnitude;
+        movementDirection.z = moveZ / moveMagnitude;
+        
+        // Calculate target yaw angle from movement direction (atan2 gives angle in radians)
+        targetHeadYaw = Math.atan2(movementDirection.x, movementDirection.z);
+        
+        // Add a slight tilt to the head in the direction of movement
+        headPitch = Math.sin(progress * 2) * 0.1 - moveMagnitude * 0.05;
+      } else {
+        // When not moving, return to a natural idle animation
+        headPitch = Math.sin(progress * 2) * 0.1;
+      }
+      
+      // Smoothly rotate head toward target direction
+      const headYawDiff = targetHeadYaw - headYaw;
+      
+      // Normalize the angle difference to be between -PI and PI
+      const normalizedHeadYawDiff = Math.atan2(Math.sin(headYawDiff), Math.cos(headYawDiff));
+      
+      // Apply smooth rotation to head
+      headYaw += normalizedHeadYawDiff * HEAD_ROTATION_SPEED * dt;
+      
+      // Body follows head with delay (follow-through effect)
+      targetBodyYaw = headYaw;
+      const bodyYawDiff = targetBodyYaw - bodyYaw;
+      
+      // Normalize the angle difference
+      const normalizedBodyYawDiff = Math.atan2(Math.sin(bodyYawDiff), Math.cos(bodyYawDiff));
+      
+      // Apply smooth rotation to body (slower than head)
+      bodyYaw += normalizedBodyYawDiff * BODY_ROTATION_SPEED * dt;
+      
+      // Natural head movement is now handled above based on movement
+      
+      // Feet follow body rotation
       leftFootYaw = bodyYaw;
       rightFootYaw = bodyYaw;
+      
+      // Store current position for next frame's movement calculation
+      prevRootPos.x = rootPos.x;
+      prevRootPos.y = rootPos.y;
+      prevRootPos.z = rootPos.z;
 
       // BODY
       body.pos.x = rootPos.x - Math.sin(progress * 1.5) * 0.6;
