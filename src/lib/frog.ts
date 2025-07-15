@@ -380,7 +380,7 @@ export function createFrog(root: TgpuRoot) {
 
       // BODY
       body.pos.x = rootPos.x;
-      body.pos.y = rootPos.y + 1.3 - Math.sin(progress * 2) * 0.05; // More subtle y-axis only animation
+      body.pos.y = rootPos.y + 1.5 - Math.sin(progress * 2) * 0.05; // Raised torso position with subtle animation
       body.pos.z = rootPos.z;
       const chestPos = std.add(body.pos, d.vec3f(0, 1, 0));
 
