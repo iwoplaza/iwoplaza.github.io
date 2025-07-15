@@ -242,7 +242,7 @@ export function createFrog(root: TgpuRoot) {
   const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
   const ARM_MAX_AMPLITUDE = 1; // Maximum amplitude when moving at full speed
   const BASE_ARM_ANIMATION_SPEED = 2.5; // Base speed of the figure-8 animation
-  const ARM_ANIMATION_SPEED = 1.3; // Speed of the figure-8 animation
+  const ARM_ANIMATION_SPEED = 1.04; // Speed of the figure-8 animation (80% of 1.3)
   let armAnimationPhase = 0.0; // Current phase of the arm animation
 
   let progress = 0;
@@ -341,7 +341,7 @@ export function createFrog(root: TgpuRoot) {
   let rightLegTransitionTime = 0;
   let leftLegInTransition = false;
   let rightLegInTransition = false;
-  const LEG_TRANSITION_DURATION = 0.3; // Duration of leg transition in seconds
+  const LEG_TRANSITION_DURATION = 0.15; // Duration of leg transition in seconds
   const FOOT_LIFT_HEIGHT = 0.4; // How high to lift the foot during transition
 
   // Initialize previous leg target positions
