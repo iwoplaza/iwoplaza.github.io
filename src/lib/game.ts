@@ -69,15 +69,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
       // Convert to joystick input (-1 to 1 range)
       const sensitivity = 0.01;
-      const cameraYaw = camera.orbitYaw;
-      const cameraCos = Math.cos(cameraYaw);
-      const cameraSin = Math.sin(cameraYaw);
-
-      // Calculate input relative to camera orientation
-      const rawX = Math.max(-1, Math.min(1, deltaX * sensitivity));
-      const rawZ = Math.max(-1, Math.min(1, deltaY * sensitivity));
-      touchInput.x = rawX * cameraCos - rawZ * cameraSin;
-      touchInput.z = rawX * cameraSin + rawZ * cameraCos;
+      
+      // Store raw input in -1 to 1 range (camera alignment will be done in run())
+      touchInput.x = Math.max(-1, Math.min(1, deltaX * sensitivity));
+      touchInput.z = Math.max(-1, Math.min(1, deltaY * sensitivity));
     }
   });
 
@@ -115,15 +110,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
       // Convert to joystick input (-1 to 1 range)
       const sensitivity = 0.01;
-      const cameraYaw = camera.orbitYaw;
-      const cameraCos = Math.cos(cameraYaw);
-      const cameraSin = Math.sin(cameraYaw);
-
-      // Calculate input relative to camera orientation
-      const rawX = Math.max(-1, Math.min(1, deltaX * sensitivity));
-      const rawZ = Math.max(-1, Math.min(1, deltaY * sensitivity));
-      touchInput.x = rawX * cameraCos - rawZ * cameraSin;
-      touchInput.z = rawX * cameraSin + rawZ * cameraCos;
+      
+      // Store raw input in -1 to 1 range (camera alignment will be done in run())
+      touchInput.x = Math.max(-1, Math.min(1, deltaX * sensitivity));
+      touchInput.z = Math.max(-1, Math.min(1, deltaY * sensitivity));
     }
   });
 
@@ -488,8 +478,18 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     } else {
       // In game mode, use touch/mouse input
       const moveSpeed = 5;
-      const frogX = touchInput.x * moveSpeed;
-      const frogZ = touchInput.z * moveSpeed;
+      
+      // Apply camera rotation to the raw touch input
+      const cameraYaw = camera.orbitYaw;
+      const cameraCos = Math.cos(cameraYaw);
+      const cameraSin = Math.sin(cameraYaw);
+      
+      // Calculate input relative to camera orientation
+      const alignedX = touchInput.x * cameraCos - touchInput.z * cameraSin;
+      const alignedZ = touchInput.x * cameraSin + touchInput.z * cameraCos;
+      
+      const frogX = alignedX * moveSpeed;
+      const frogZ = alignedZ * moveSpeed;
       frog.position = d.vec3f(frogX, 0, frogZ);
     }
 
