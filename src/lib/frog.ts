@@ -226,11 +226,17 @@ export function createFrog(root: TgpuRoot) {
   const prevRootPos = d.vec3f();
   const movementDirection = d.vec3f(0, 0, 1); // Default forward direction
   const velocity = d.vec3f(); // Current velocity
+  const movement = d.vec3f(); // Desired movement direction and magnitude
 
   // Rotation parameters
   const HEAD_ROTATION_SPEED = 8.0; // How quickly the head turns to face movement
   const BODY_ROTATION_SPEED = 7; // How quickly the body follows the head (slower for follow-through)
   const MIN_MOVEMENT_THRESHOLD = 0.001; // Minimum movement required to change direction
+
+  // Movement parameters
+  const MAX_SPEED = 8; // Maximum movement speed
+  const ACCELERATION = 20; // How quickly velocity approaches target movement
+  const DECELERATION = 15; // How quickly velocity decelerates when no input
 
   // Arm animation parameters
   const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
@@ -338,16 +344,37 @@ export function createFrog(root: TgpuRoot) {
       rootPos.y = v.y;
       rootPos.z = v.z;
     },
-    get velocity() {
-      return velocity;
+    get movement() {
+      return movement;
     },
-    set velocity(v: d.v3f) {
-      velocity.x = v.x;
-      velocity.y = v.y;
-      velocity.z = v.z;
+    set movement(v: d.v3f) {
+      movement.x = v.x;
+      movement.y = v.y;
+      movement.z = v.z;
     },
     update(dt: number) {
       progress += dt;
+      
+      // Calculate target velocity from movement input
+      const targetVelocity = d.vec3f(
+        movement.x * MAX_SPEED,
+        movement.y * MAX_SPEED,
+        movement.z * MAX_SPEED,
+      );
+      
+      // Smoothly interpolate velocity towards target
+      const movementMagnitude = Math.sqrt(movement.x * movement.x + movement.y * movement.y + movement.z * movement.z);
+      const accelerationRate = movementMagnitude > 0.001 ? ACCELERATION : DECELERATION;
+      
+      const velocityDiff = d.vec3f(
+        targetVelocity.x - velocity.x,
+        targetVelocity.y - velocity.y,
+        targetVelocity.z - velocity.z,
+      );
+      
+      velocity.x += velocityDiff.x * accelerationRate * dt;
+      velocity.y += velocityDiff.y * accelerationRate * dt;
+      velocity.z += velocityDiff.z * accelerationRate * dt;
       
       // Apply velocity to position
       rootPos.x += velocity.x * dt;
