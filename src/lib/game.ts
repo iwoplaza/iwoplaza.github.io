@@ -503,6 +503,12 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     frog.update(dt);
     frog.uploadRig();
+    
+    // Update camera to follow frog position with overshooting effect
+    if (!INSPECT) {
+      camera.updateTargetPosition(frog.position, dt);
+    }
+    
     updateSceneAABBs();
 
     const view = context.getCurrentTexture().createView();
