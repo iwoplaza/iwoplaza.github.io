@@ -216,11 +216,11 @@ export function createFrog(root: TgpuRoot) {
   // IK target positions
   const leftArmTarget = d.vec3f(-1.8, 2, 1);
   const rightArmTarget = d.vec3f(1.8, 2, 1);
-  const leftLegTarget = d.vec3f(-0.6, 0, 0.8); // More in front of the body (positive Z)
-  const rightLegTarget = d.vec3f(0.6, 0, 0.8); // More in front of the body (positive Z)
+  const leftLegTarget = d.vec3f(-0.6, 0, 0.1);
+  const rightLegTarget = d.vec3f(0.6, 0, 0.1);
 
   // Maximum distance a target can be from the body before resetting
-  const MAX_TARGET_DISTANCE = 0.1;
+  const MAX_TARGET_DISTANCE = 0.6;
 
   // Movement tracking for rotation
   const prevRootPos = d.vec3f();
@@ -559,44 +559,46 @@ export function createFrog(root: TgpuRoot) {
         Math.cos(rightFootYaw),
       );
 
-      // Calculate distance from body to leg targets
-      const leftLegTargetDist = vec3.distance(leftLegTarget, bodyGlobalPos);
-      const rightLegTargetDist = vec3.distance(rightLegTarget, bodyGlobalPos);
-
-      const prefersLeftLeg = (armAnimationPhase / (Math.PI * 2)) % 1 > 0.5;
-      // Reset leg targets if they're too far from the body
-      if (
-        leftLegTargetDist > MAX_TARGET_DISTANCE * moveMagnitude &&
-        prefersLeftLeg &&
-        rightLegPlaced
-      ) {
-        rightLegPlaced = false;
-        // Position in front of the body
-        const pick = std.add(
-          rootPos,
-          std.add(
-            std.mul(headForward, 0.2 + 0.2 * moveMagnitude),
-            std.mul(headRight, -0.6),
-          ),
-        );
-        vec3.copy(pick, leftLegTarget);
+      let prefersLeftLeg =
+        (armAnimationPhase / (Math.PI * 2)) % 1 > 0.5 && rightLegPlaced;
+      let prefersRightLeg =
+        (armAnimationPhase / (Math.PI * 2)) % 1 < 0.5 && !rightLegPlaced;
+      if (velocityFactor < 0.1) {
+        // We care less about placing steps in synchronicity
+        prefersLeftLeg = true;
+        prefersRightLeg = true;
       }
 
-      if (
-        rightLegTargetDist > MAX_TARGET_DISTANCE * moveMagnitude &&
-        !prefersLeftLeg &&
-        !rightLegPlaced
-      ) {
+      const leftPick = std.add(
+        rootPos,
+        std.add(
+          std.mul(headForward, 0.2 + 1.6 * velocityFactor),
+          std.mul(headRight, -0.6),
+        ),
+      );
+
+      // Position in front of the body
+      const rightPick = std.add(
+        rootPos,
+        std.add(
+          std.mul(headForward, 0.2 + 1.6 * velocityFactor),
+          std.mul(headRight, 0.6),
+        ),
+      );
+
+      // Calculate distance from the current and the desired position
+      const leftLegTargetDist = vec3.distance(leftLegTarget, leftPick);
+      const rightLegTargetDist = vec3.distance(rightLegTarget, rightPick);
+
+      // Reset leg targets if they're too far from the body
+      if (leftLegTargetDist > MAX_TARGET_DISTANCE && prefersLeftLeg) {
+        rightLegPlaced = false;
+        vec3.copy(leftPick, leftLegTarget);
+      }
+
+      if (rightLegTargetDist > MAX_TARGET_DISTANCE && prefersRightLeg) {
         rightLegPlaced = true;
-        // Position in front of the body
-        const pick = std.add(
-          rootPos,
-          std.add(
-            std.mul(headForward, 0.2 + 0.2 * moveMagnitude),
-            std.mul(headRight, 0.6),
-          ),
-        );
-        vec3.copy(pick, rightLegTarget);
+        vec3.copy(rightPick, rightLegTarget);
       }
 
       const leftLegPoints = solveIK(
