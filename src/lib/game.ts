@@ -69,14 +69,14 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
       // Convert to joystick input (-1 to 1 range)
       const sensitivity = 0.01;
-      
+
       // Calculate raw input values
       const rawX = deltaX * sensitivity;
       const rawZ = deltaY * sensitivity;
-      
+
       // Calculate magnitude of the input vector
       const magnitude = Math.sqrt(rawX * rawX + rawZ * rawZ);
-      
+
       // Normalize if magnitude exceeds 1 to ensure consistent max speed in all directions
       if (magnitude > 1) {
         touchInput.x = rawX / magnitude;
@@ -122,14 +122,14 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
       // Convert to joystick input (-1 to 1 range)
       const sensitivity = 0.01;
-      
+
       // Calculate raw input values
       const rawX = deltaX * sensitivity;
       const rawZ = deltaY * sensitivity;
-      
+
       // Calculate magnitude of the input vector
       const magnitude = Math.sqrt(rawX * rawX + rawZ * rawZ);
-      
+
       // Normalize if magnitude exceeds 1 to ensure consistent max speed in all directions
       if (magnitude > 1) {
         touchInput.x = rawX / magnitude;
@@ -501,38 +501,38 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       frog.position = d.vec3f(frogX, 0, frogZ);
     } else {
       // In game mode, use touch/mouse input
-      const moveSpeed = 10 * dt; // Scale by delta time for frame-rate independent movement
-      
+      const moveSpeed = 8 * dt; // Scale by delta time for frame-rate independent movement
+
       // Apply camera rotation to the raw touch input
       const cameraYaw = camera.orbitYaw;
       const cameraCos = Math.cos(cameraYaw);
       const cameraSin = Math.sin(cameraYaw);
-      
+
       // Calculate input relative to camera orientation
       const alignedX = touchInput.x * cameraCos - touchInput.z * cameraSin;
       const alignedZ = touchInput.x * cameraSin + touchInput.z * cameraCos;
-      
+
       // Calculate movement offset
       const offsetX = alignedX * moveSpeed;
       const offsetZ = alignedZ * moveSpeed;
-      
+
       // Offset the frog's position instead of setting it directly
       const currentPos = frog.position;
       frog.position = d.vec3f(
         currentPos.x + offsetX,
         currentPos.y,
-        currentPos.z + offsetZ
+        currentPos.z + offsetZ,
       );
     }
 
     frog.update(dt);
     frog.uploadRig();
-    
+
     // Update camera to follow frog position with overshooting effect
     if (!INSPECT) {
       camera.updateTargetPosition(frog.position, dt);
     }
-    
+
     updateSceneAABBs();
 
     const view = context.getCurrentTexture().createView();

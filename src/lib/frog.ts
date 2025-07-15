@@ -220,7 +220,7 @@ export function createFrog(root: TgpuRoot) {
   const rightLegTarget = d.vec3f(0.6, 0, 0.8); // More in front of the body (positive Z)
 
   // Maximum distance a target can be from the body before resetting
-  const MAX_TARGET_DISTANCE = 2.0;
+  const MAX_TARGET_DISTANCE = 0.1;
 
   // Movement tracking for rotation
   const prevRootPos = d.vec3f();
@@ -233,16 +233,19 @@ export function createFrog(root: TgpuRoot) {
 
   // Arm animation parameters
   const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
-  const ARM_MAX_AMPLITUDE = 1.8; // Maximum amplitude when moving at full speed
-  const ARM_ANIMATION_SPEED = 6.0; // Base speed of the figure-8 animation
+  const ARM_MAX_AMPLITUDE = 1; // Maximum amplitude when moving at full speed
+  const BASE_ARM_ANIMATION_SPEED = 2.5; // Base speed of the figure-8 animation
+  const ARM_ANIMATION_SPEED = 1.3; // Speed of the figure-8 animation
   let armAnimationPhase = 0.0; // Current phase of the arm animation
 
   let progress = 0;
+  let rootYaw = 0;
+  let targetRootYaw = 0;
   let headPitch = 0;
   let headYaw = 0;
   let targetHeadYaw = 0;
   let bodyYaw = 0;
-  let targetBodyYaw = 0;
+  let bodyPitch = 0;
   let leftFootYaw = 0;
   let rightFootYaw = 0;
   const rootPos = d.vec3f();
@@ -321,6 +324,8 @@ export function createFrog(root: TgpuRoot) {
     return shapeUnion(skin, backpack);
   });
 
+  let rightLegPlaced = false;
+
   return {
     getFrog,
     get position() {
@@ -333,11 +338,36 @@ export function createFrog(root: TgpuRoot) {
     },
     update(dt: number) {
       progress += dt;
-
       // Calculate movement direction
       const moveX = rootPos.x - prevRootPos.x;
       const moveZ = rootPos.z - prevRootPos.z;
-      const moveMagnitude = Math.sqrt(moveX * moveX + moveZ * moveZ);
+      const moveMagnitude =
+        Math.sqrt(moveX * moveX + moveZ * moveZ) / Math.max(0.001, dt);
+
+      // Progress the arm animation phase based on movement velocity
+      // When moving faster, the arms should swing more rapidly
+      // When stationary, they should still have a subtle movement
+      const velocityPhaseBoost =
+        BASE_ARM_ANIMATION_SPEED + moveMagnitude * ARM_ANIMATION_SPEED;
+      armAnimationPhase += velocityPhaseBoost * dt;
+
+      // Keep the phase within a reasonable range to avoid floating point issues
+      if (armAnimationPhase > Math.PI * 2) {
+        armAnimationPhase -= Math.PI * 2;
+      }
+
+      // Calculate the figure-8 pattern
+      // Figure-8 is created using sin for horizontal and sin*cos for vertical movement
+      const figure8X = Math.sin(armAnimationPhase);
+      const figure8Y = Math.sin(armAnimationPhase * 2 - 0.5) * 0.5; // Vertical component of figure-8
+
+      // Scale the amplitude based on movement velocity
+      // Map movement magnitude to a 0-1 range for amplitude scaling
+      // Use a minimum threshold to ensure some movement even when nearly stationary
+      const velocityFactor = std.clamp(moveMagnitude * 0.2, 0.01, 1); // Scale up for better response
+      const armAmplitude =
+        ARM_FIGURE8_BASE_AMPLITUDE +
+        (ARM_MAX_AMPLITUDE - ARM_FIGURE8_BASE_AMPLITUDE) * velocityFactor;
 
       // Update movement direction if there is significant movement
       if (moveMagnitude > MIN_MOVEMENT_THRESHOLD) {
@@ -347,11 +377,12 @@ export function createFrog(root: TgpuRoot) {
         // Calculate target yaw angle from movement direction (atan2 gives angle in radians)
         targetHeadYaw = Math.atan2(movementDirection.x, movementDirection.z);
 
-        // Add a slight tilt to the head in the direction of movement
-        headPitch = Math.sin(progress * 2) * 0.1 - moveMagnitude * 0.05;
+        // Add a slight tilt to the body in the direction of movement
+        bodyPitch = moveMagnitude * 0.03;
       } else {
         // When not moving, return to a natural idle animation
         headPitch = Math.sin(progress * 2) * 0.1;
+        bodyPitch = 0;
       }
 
       // Smoothly rotate head toward target direction
@@ -369,33 +400,24 @@ export function createFrog(root: TgpuRoot) {
       const headForward = d.vec3f(Math.sin(headYaw), 0, Math.cos(headYaw));
 
       // Body follows head with delay (follow-through effect)
-      targetBodyYaw = headYaw;
-      const bodyYawDiff = targetBodyYaw - bodyYaw;
+      targetRootYaw = headYaw;
+      const rootYawDiff = targetRootYaw - rootYaw;
 
       // Normalize the angle difference
-      const normalizedBodyYawDiff = Math.atan2(
-        Math.sin(bodyYawDiff),
-        Math.cos(bodyYawDiff),
+      const normalizedRootYawDiff = Math.atan2(
+        Math.sin(rootYawDiff),
+        Math.cos(rootYawDiff),
       );
 
       // Apply smooth rotation to body (slower than head)
-      bodyYaw += normalizedBodyYawDiff * BODY_ROTATION_SPEED * dt;
+      rootYaw += normalizedRootYawDiff * BODY_ROTATION_SPEED * dt;
+
+      // Actual body rotation
+      bodyYaw = rootYaw + figure8X * armAmplitude * 0.4;
 
       // Feet follow body rotation
-      leftFootYaw = bodyYaw;
-      rightFootYaw = bodyYaw;
-
-      // Progress the arm animation phase based on movement velocity
-      // When moving faster, the arms should swing more rapidly
-      // When stationary, they should still have a subtle movement
-      const basePhaseIncrement = ARM_ANIMATION_SPEED * dt;
-      const velocityPhaseBoost = moveMagnitude * 10.0 * dt; // Scale movement to have more impact
-      armAnimationPhase += basePhaseIncrement + velocityPhaseBoost;
-
-      // Keep the phase within a reasonable range to avoid floating point issues
-      if (armAnimationPhase > Math.PI * 2) {
-        armAnimationPhase -= Math.PI * 2;
-      }
+      leftFootYaw = rootYaw;
+      rightFootYaw = rootYaw;
 
       // Store current position for next frame's movement calculation
       prevRootPos.x = rootPos.x;
@@ -404,14 +426,18 @@ export function createFrog(root: TgpuRoot) {
 
       // BODY
       body.pos.x = rootPos.x;
-      body.pos.y = rootPos.y + 1.5 - Math.sin(progress * 2) * 0.05; // Raised torso position with subtle animation
+      body.pos.y =
+        rootPos.y +
+        1.5 -
+        Math.sin(progress * 2) * 0.05 + // Raised torso position with subtle animation
+        figure8Y * armAmplitude * 0.3;
       body.pos.z = rootPos.z;
       const chestPos = std.add(body.pos, d.vec3f(0, 1, 0));
 
-      quatn.fromEuler(0, bodyYaw, 0, 'yxz', body.rot);
+      quatn.fromEuler(bodyPitch, bodyYaw, 0, 'yxz', body.rot);
       body.compute();
 
-      const hipDir = d.vec3f(Math.sin(bodyYaw), 0, Math.cos(bodyYaw));
+      const hipDir = d.vec3f(Math.sin(rootYaw), 0, Math.cos(rootYaw));
       const armPull = std.neg(hipDir);
 
       // HEAD
@@ -438,18 +464,7 @@ export function createFrog(root: TgpuRoot) {
         d.vec3f(),
       );
 
-      // Calculate the figure-8 pattern
-      // Figure-8 is created using sin for horizontal and sin*cos for vertical movement
-      const figure8X = Math.sin(armAnimationPhase);
-      const figure8Y = Math.sin(armAnimationPhase * 2) * 0.5; // Vertical component of figure-8
-
-      // Scale the amplitude based on movement velocity
-      // Map movement magnitude to a 0-1 range for amplitude scaling
-      // Use a minimum threshold to ensure some movement even when nearly stationary
-      const velocityFactor = Math.min(1.0, moveMagnitude * 5.0); // Scale up for better response
-      const armAmplitude =
-        ARM_FIGURE8_BASE_AMPLITUDE +
-        (ARM_MAX_AMPLITUDE - ARM_FIGURE8_BASE_AMPLITUDE) * velocityFactor;
+      const baseArmOffset = 0.1 + 0.4 * velocityFactor;
 
       // Left arm target - positioned to the left side of the body
       vec3.copy(
@@ -459,7 +474,7 @@ export function createFrog(root: TgpuRoot) {
             std.mul(headForward, figure8X * armAmplitude + 0.1),
             std.add(
               std.mul(headRight, -1.3),
-              d.vec3f(0, figure8Y * armAmplitude * 0.7 + 0.5, 0),
+              d.vec3f(0, figure8Y * armAmplitude * 0.7 + baseArmOffset, 0),
             ),
           ),
         ),
@@ -474,7 +489,7 @@ export function createFrog(root: TgpuRoot) {
             std.mul(headForward, -figure8X * armAmplitude + 0.1),
             std.add(
               std.mul(headRight, 1.3),
-              d.vec3f(0, figure8Y * armAmplitude * 0.7 + 0.5, 0),
+              d.vec3f(0, figure8Y * armAmplitude * 0.7 + baseArmOffset, 0),
             ),
           ),
         ),
@@ -548,17 +563,40 @@ export function createFrog(root: TgpuRoot) {
       const leftLegTargetDist = vec3.distance(leftLegTarget, bodyGlobalPos);
       const rightLegTargetDist = vec3.distance(rightLegTarget, bodyGlobalPos);
 
+      const prefersLeftLeg = (armAnimationPhase / (Math.PI * 2)) % 1 > 0.5;
       // Reset leg targets if they're too far from the body
-      if (leftLegTargetDist > MAX_TARGET_DISTANCE) {
-        leftLegTarget.x = bodyGlobalPos.x - 0.6;
-        leftLegTarget.y = bodyGlobalPos.y - 1.0;
-        leftLegTarget.z = bodyGlobalPos.z + 0.8; // Position in front of the body
+      if (
+        leftLegTargetDist > MAX_TARGET_DISTANCE * moveMagnitude &&
+        prefersLeftLeg &&
+        rightLegPlaced
+      ) {
+        rightLegPlaced = false;
+        // Position in front of the body
+        const pick = std.add(
+          rootPos,
+          std.add(
+            std.mul(headForward, 0.2 + 0.2 * moveMagnitude),
+            std.mul(headRight, -0.6),
+          ),
+        );
+        vec3.copy(pick, leftLegTarget);
       }
 
-      if (rightLegTargetDist > MAX_TARGET_DISTANCE) {
-        rightLegTarget.x = bodyGlobalPos.x + 0.6;
-        rightLegTarget.y = bodyGlobalPos.y - 1.0;
-        rightLegTarget.z = bodyGlobalPos.z + 0.8; // Position in front of the body
+      if (
+        rightLegTargetDist > MAX_TARGET_DISTANCE * moveMagnitude &&
+        !prefersLeftLeg &&
+        !rightLegPlaced
+      ) {
+        rightLegPlaced = true;
+        // Position in front of the body
+        const pick = std.add(
+          rootPos,
+          std.add(
+            std.mul(headForward, 0.2 + 0.2 * moveMagnitude),
+            std.mul(headRight, 0.6),
+          ),
+        );
+        vec3.copy(pick, rightLegTarget);
       }
 
       const leftLegPoints = solveIK(
