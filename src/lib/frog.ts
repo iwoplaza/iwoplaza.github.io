@@ -216,8 +216,8 @@ export function createFrog(root: TgpuRoot) {
   // IK target positions
   const leftArmTarget = d.vec3f(-1.8, 2, 1);
   const rightArmTarget = d.vec3f(1.8, 2, 1);
-  const leftLegTarget = d.vec3f(-0.6, 0, 0);
-  const rightLegTarget = d.vec3f(0.6, 0, 0);
+  const leftLegTarget = d.vec3f(-0.6, 0, 0.8);  // More in front of the body (positive Z)
+  const rightLegTarget = d.vec3f(0.6, 0, 0.8);  // More in front of the body (positive Z)
   
   // Maximum distance a target can be from the body before resetting
   const MAX_TARGET_DISTANCE = 2.0;
@@ -502,13 +502,13 @@ export function createFrog(root: TgpuRoot) {
       if (leftLegTargetDist > MAX_TARGET_DISTANCE) {
         leftLegTarget.x = bodyGlobalPos.x - 0.6;
         leftLegTarget.y = bodyGlobalPos.y - 1.0;
-        leftLegTarget.z = bodyGlobalPos.z;
+        leftLegTarget.z = bodyGlobalPos.z + 0.8; // Position in front of the body
       }
       
       if (rightLegTargetDist > MAX_TARGET_DISTANCE) {
         rightLegTarget.x = bodyGlobalPos.x + 0.6;
         rightLegTarget.y = bodyGlobalPos.y - 1.0;
-        rightLegTarget.z = bodyGlobalPos.z;
+        rightLegTarget.z = bodyGlobalPos.z + 0.8; // Position in front of the body
       }
 
       const leftLegPoints = solveIK(
