@@ -231,6 +231,12 @@ export function createFrog(root: TgpuRoot) {
   const BODY_ROTATION_SPEED = 2.5;  // How quickly the body follows the head (slower for follow-through)
   const MIN_MOVEMENT_THRESHOLD = 0.01; // Minimum movement required to change direction
   
+  // Arm animation parameters
+  const ARM_FIGURE8_BASE_AMPLITUDE = 0.3; // Base amplitude of the figure-8 pattern
+  const ARM_MAX_AMPLITUDE = 1.2;          // Maximum amplitude when moving at full speed
+  const ARM_ANIMATION_SPEED = 5.0;        // Base speed of the figure-8 animation
+  let armAnimationPhase = 0.0;            // Current phase of the arm animation
+  
   let progress = 0;
   let headPitch = 0;
   let headYaw = 0;
@@ -373,6 +379,18 @@ export function createFrog(root: TgpuRoot) {
       leftFootYaw = bodyYaw;
       rightFootYaw = bodyYaw;
       
+      // Progress the arm animation phase based on movement velocity
+      // When moving faster, the arms should swing more rapidly
+      // When stationary, they should still have a subtle movement
+      const basePhaseIncrement = ARM_ANIMATION_SPEED * dt;
+      const velocityPhaseBoost = moveMagnitude * 10.0 * dt; // Scale movement to have more impact
+      armAnimationPhase += basePhaseIncrement + velocityPhaseBoost;
+      
+      // Keep the phase within a reasonable range to avoid floating point issues
+      if (armAnimationPhase > Math.PI * 2) {
+        armAnimationPhase -= Math.PI * 2;
+      }
+      
       // Store current position for next frame's movement calculation
       prevRootPos.x = rootPos.x;
       prevRootPos.y = rootPos.y;
@@ -418,14 +436,44 @@ export function createFrog(root: TgpuRoot) {
       const leftArmTargetDist = vec3.distance(leftArmTarget, bodyGlobalPos);
       const rightArmTargetDist = vec3.distance(rightArmTarget, bodyGlobalPos);
       
-      // Reset arm targets if they're too far from the body
-      if (leftArmTargetDist > MAX_TARGET_DISTANCE) {
+      // Calculate vectors perpendicular to the body direction for arm movement
+      // hipDir is already defined as the forward direction of the body
+      // We need a vector perpendicular to hipDir for the side-to-side movement
+      const sideDir = d.vec3f(-hipDir.z, 0, hipDir.x); // Cross product with up vector (0,1,0)
+      
+      // Calculate the figure-8 pattern
+      // Figure-8 is created using sin for horizontal and sin*cos for vertical movement
+      const figure8X = Math.sin(armAnimationPhase);
+      const figure8Y = Math.sin(armAnimationPhase * 2) * 0.5; // Vertical component of figure-8
+      
+      // Scale the amplitude based on movement velocity
+      // Map movement magnitude to a 0-1 range for amplitude scaling
+      // Use a minimum threshold to ensure some movement even when nearly stationary
+      const velocityFactor = Math.min(1.0, moveMagnitude * 5.0); // Scale up for better response
+      const armAmplitude = ARM_FIGURE8_BASE_AMPLITUDE + (ARM_MAX_AMPLITUDE - ARM_FIGURE8_BASE_AMPLITUDE) * velocityFactor;
+      
+      // Calculate arm target positions using the figure-8 pattern
+      // The pattern is applied perpendicular to the body direction
+      const baseArmHeight = bodyGlobalPos.y + 1.2; // Base height for arms
+      
+      // Left arm target - positioned to the left side of the body
+      leftArmTarget.x = bodyGlobalPos.x - 1.0 + sideDir.x * figure8X * armAmplitude;
+      leftArmTarget.y = baseArmHeight + figure8Y * armAmplitude;
+      leftArmTarget.z = bodyGlobalPos.z + 0.5 + sideDir.z * figure8X * armAmplitude;
+      
+      // Right arm target - positioned to the right side of the body
+      rightArmTarget.x = bodyGlobalPos.x + 1.0 + sideDir.x * -figure8X * armAmplitude; // Mirrored pattern
+      rightArmTarget.y = baseArmHeight + figure8Y * armAmplitude;
+      rightArmTarget.z = bodyGlobalPos.z + 0.5 + sideDir.z * -figure8X * armAmplitude; // Mirrored pattern
+      
+      // Reset arm targets if they're too far from the body (safety check)
+      if (leftArmTargetDist > MAX_TARGET_DISTANCE * 1.5) {
         leftArmTarget.x = bodyGlobalPos.x - 1.0;
         leftArmTarget.y = bodyGlobalPos.y + 1.0;
         leftArmTarget.z = bodyGlobalPos.z + 0.5;
       }
       
-      if (rightArmTargetDist > MAX_TARGET_DISTANCE) {
+      if (rightArmTargetDist > MAX_TARGET_DISTANCE * 1.5) {
         rightArmTarget.x = bodyGlobalPos.x + 1.0;
         rightArmTarget.y = bodyGlobalPos.y + 1.0;
         rightArmTarget.z = bodyGlobalPos.z + 0.5;
