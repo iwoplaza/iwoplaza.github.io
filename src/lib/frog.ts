@@ -334,6 +334,20 @@ export function createFrog(root: TgpuRoot) {
 
   let rightLegPlaced = false;
 
+  // Leg transition state
+  const leftLegPrevTarget = d.vec3f();
+  const rightLegPrevTarget = d.vec3f();
+  let leftLegTransitionTime = 0;
+  let rightLegTransitionTime = 0;
+  let leftLegInTransition = false;
+  let rightLegInTransition = false;
+  const LEG_TRANSITION_DURATION = 0.3; // Duration of leg transition in seconds
+  const FOOT_LIFT_HEIGHT = 0.4; // How high to lift the foot during transition
+
+  // Initialize previous leg target positions
+  vec3.copy(leftLegTarget, leftLegPrevTarget);
+  vec3.copy(rightLegTarget, rightLegPrevTarget);
+
   return {
     getFrog,
     get position() {
@@ -643,15 +657,63 @@ export function createFrog(root: TgpuRoot) {
       const leftLegTargetDist = vec3.distance(leftLegTarget, leftPick);
       const rightLegTargetDist = vec3.distance(rightLegTarget, rightPick);
 
-      // Reset leg targets if they're too far from the body
-      if (leftLegTargetDist > MAX_TARGET_DISTANCE && prefersLeftLeg) {
-        rightLegPlaced = false;
-        vec3.copy(leftPick, leftLegTarget);
+      // Update leg transition timers
+      if (leftLegInTransition) {
+        leftLegTransitionTime += dt;
+        if (leftLegTransitionTime >= LEG_TRANSITION_DURATION) {
+          leftLegInTransition = false;
+          leftLegTransitionTime = 0;
+        }
       }
 
-      if (rightLegTargetDist > MAX_TARGET_DISTANCE && prefersRightLeg) {
+      if (rightLegInTransition) {
+        rightLegTransitionTime += dt;
+        if (rightLegTransitionTime >= LEG_TRANSITION_DURATION) {
+          rightLegInTransition = false;
+          rightLegTransitionTime = 0;
+        }
+      }
+
+      // Start leg transitions if they're too far from the body
+      if (leftLegTargetDist > MAX_TARGET_DISTANCE && prefersLeftLeg && !leftLegInTransition) {
+        rightLegPlaced = false;
+        vec3.copy(leftLegTarget, leftLegPrevTarget);
+        leftLegInTransition = true;
+        leftLegTransitionTime = 0;
+      }
+
+      if (rightLegTargetDist > MAX_TARGET_DISTANCE && prefersRightLeg && !rightLegInTransition) {
         rightLegPlaced = true;
-        vec3.copy(rightPick, rightLegTarget);
+        vec3.copy(rightLegTarget, rightLegPrevTarget);
+        rightLegInTransition = true;
+        rightLegTransitionTime = 0;
+      }
+
+      // Interpolate leg targets during transitions
+      if (leftLegInTransition) {
+        const t = leftLegTransitionTime / LEG_TRANSITION_DURATION;
+        const smoothT = t * t * (3 - 2 * t); // Smooth step interpolation
+        
+        // Linear interpolation between previous and new target
+        leftLegTarget.x = leftLegPrevTarget.x + (leftPick.x - leftLegPrevTarget.x) * smoothT;
+        leftLegTarget.z = leftLegPrevTarget.z + (leftPick.z - leftLegPrevTarget.z) * smoothT;
+        
+        // Add foot lift using sine curve
+        const liftAmount = Math.sin(t * Math.PI) * FOOT_LIFT_HEIGHT;
+        leftLegTarget.y = leftLegPrevTarget.y + (leftPick.y - leftLegPrevTarget.y) * smoothT + liftAmount;
+      }
+
+      if (rightLegInTransition) {
+        const t = rightLegTransitionTime / LEG_TRANSITION_DURATION;
+        const smoothT = t * t * (3 - 2 * t); // Smooth step interpolation
+        
+        // Linear interpolation between previous and new target
+        rightLegTarget.x = rightLegPrevTarget.x + (rightPick.x - rightLegPrevTarget.x) * smoothT;
+        rightLegTarget.z = rightLegPrevTarget.z + (rightPick.z - rightLegPrevTarget.z) * smoothT;
+        
+        // Add foot lift using sine curve
+        const liftAmount = Math.sin(t * Math.PI) * FOOT_LIFT_HEIGHT;
+        rightLegTarget.y = rightLegPrevTarget.y + (rightPick.y - rightLegPrevTarget.y) * smoothT + liftAmount;
       }
 
       const leftLegPoints = solveIK(
