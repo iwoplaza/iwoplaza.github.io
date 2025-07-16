@@ -242,7 +242,7 @@ export function createFrog(root: TgpuRoot) {
   const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
   const ARM_MAX_AMPLITUDE = 1; // Maximum amplitude when moving at full speed
   const BASE_ARM_ANIMATION_SPEED = 2.5; // Base speed of the figure-8 animation
-  const ARM_ANIMATION_SPEED = 1.04; // Speed of the figure-8 animation (80% of 1.3)
+  const ARM_ANIMATION_SPEED = 1.1; // Speed of the figure-8 animation
   let armAnimationPhase = 0.0; // Current phase of the arm animation
 
   let progress = 0;
@@ -341,8 +341,8 @@ export function createFrog(root: TgpuRoot) {
   let rightLegTransitionTime = 0;
   let leftLegInTransition = false;
   let rightLegInTransition = false;
-  const LEG_TRANSITION_DURATION = 0.15; // Duration of leg transition in seconds
-  const FOOT_LIFT_HEIGHT = 0.4; // How high to lift the foot during transition
+  const LEG_TRANSITION_DURATION = 0.25; // Duration of leg transition in seconds
+  const FOOT_LIFT_HEIGHT = 0.6; // How high to lift the foot during transition
 
   // Initialize previous leg target positions
   vec3.copy(leftLegTarget, leftLegPrevTarget);
@@ -368,33 +368,38 @@ export function createFrog(root: TgpuRoot) {
     },
     update(dt: number) {
       progress += dt;
-      
+
       // Calculate target velocity from movement input
       const targetVelocity = d.vec3f(
         movement.x * MAX_SPEED,
         movement.y * MAX_SPEED,
         movement.z * MAX_SPEED,
       );
-      
+
       // Smoothly interpolate velocity towards target
-      const movementMagnitude = Math.sqrt(movement.x * movement.x + movement.y * movement.y + movement.z * movement.z);
-      const accelerationRate = movementMagnitude > 0.001 ? ACCELERATION : DECELERATION;
-      
+      const movementMagnitude = Math.sqrt(
+        movement.x * movement.x +
+          movement.y * movement.y +
+          movement.z * movement.z,
+      );
+      const accelerationRate =
+        movementMagnitude > 0.001 ? ACCELERATION : DECELERATION;
+
       const velocityDiff = d.vec3f(
         targetVelocity.x - velocity.x,
         targetVelocity.y - velocity.y,
         targetVelocity.z - velocity.z,
       );
-      
+
       velocity.x += velocityDiff.x * accelerationRate * dt;
       velocity.y += velocityDiff.y * accelerationRate * dt;
       velocity.z += velocityDiff.z * accelerationRate * dt;
-      
+
       // Apply velocity to position
       rootPos.x += velocity.x * dt;
       rootPos.y += velocity.y * dt;
       rootPos.z += velocity.z * dt;
-      
+
       // Calculate movement direction
       const moveX = rootPos.x - prevRootPos.x;
       const moveZ = rootPos.z - prevRootPos.z;
@@ -405,8 +410,7 @@ export function createFrog(root: TgpuRoot) {
       // When moving faster, the arms should swing more rapidly
       // When stationary, they should still have a subtle movement
       const velocityPhaseBoost =
-        BASE_ARM_ANIMATION_SPEED +
-        moveMagnitude * ARM_ANIMATION_SPEED;
+        BASE_ARM_ANIMATION_SPEED + moveMagnitude * ARM_ANIMATION_SPEED;
       armAnimationPhase += velocityPhaseBoost * dt;
 
       // Keep the phase within a reasonable range to avoid floating point issues
@@ -450,7 +454,6 @@ export function createFrog(root: TgpuRoot) {
         Math.sin(headBodyYawDiff),
         Math.cos(headBodyYawDiff),
       );
-
 
       // Smoothly rotate head toward target direction
       const headYawDiff = targetHeadYaw - headYaw;
@@ -531,16 +534,16 @@ export function createFrog(root: TgpuRoot) {
         d.vec3f(),
       );
 
-      const baseArmOffset = 0.1 + 0.4 * velocityFactor;
+      const baseArmOffset = 1.5 + 0.5 * velocityFactor;
 
       // Left arm target - positioned to the left side of the body
       vec3.copy(
         std.add(
-          bodyGlobalPos,
+          rootPos,
           std.add(
             std.mul(headForward, figure8X * armAmplitude + 0.1),
             std.add(
-              std.mul(headRight, -1.3),
+              std.mul(headRight, -1.1),
               d.vec3f(0, figure8Y * armAmplitude * 0.7 + baseArmOffset, 0),
             ),
           ),
@@ -551,11 +554,11 @@ export function createFrog(root: TgpuRoot) {
       // Right arm target - positioned to the right side of the body
       vec3.copy(
         std.add(
-          bodyGlobalPos,
+          rootPos,
           std.add(
             std.mul(headForward, -figure8X * armAmplitude + 0.1),
             std.add(
-              std.mul(headRight, 1.3),
+              std.mul(headRight, 1.1),
               d.vec3f(0, figure8Y * armAmplitude * 0.7 + baseArmOffset, 0),
             ),
           ),
@@ -627,9 +630,9 @@ export function createFrog(root: TgpuRoot) {
       );
 
       let prefersLeftLeg =
-        (armAnimationPhase / (Math.PI * 2)) % 1 > 0.5 && rightLegPlaced;
+        (armAnimationPhase / (Math.PI * 2) + 0.2) % 1 > 0.5 && rightLegPlaced;
       let prefersRightLeg =
-        (armAnimationPhase / (Math.PI * 2)) % 1 < 0.5 && !rightLegPlaced;
+        (armAnimationPhase / (Math.PI * 2) + 0.2) % 1 < 0.5 && !rightLegPlaced;
       if (velocityFactor < 0.1) {
         // We care less about placing steps in synchronicity
         prefersLeftLeg = true;
@@ -639,8 +642,8 @@ export function createFrog(root: TgpuRoot) {
       const leftPick = std.add(
         rootPos,
         std.add(
-          std.mul(headForward, 0.2 + 1.6 * velocityFactor),
-          std.mul(headRight, -0.6),
+          std.mul(headForward, 0.2 + 1.4 * velocityFactor),
+          std.mul(headRight, -0.4),
         ),
       );
 
@@ -648,8 +651,8 @@ export function createFrog(root: TgpuRoot) {
       const rightPick = std.add(
         rootPos,
         std.add(
-          std.mul(headForward, 0.2 + 1.6 * velocityFactor),
-          std.mul(headRight, 0.6),
+          std.mul(headForward, 0.2 + 1.4 * velocityFactor),
+          std.mul(headRight, 0.4),
         ),
       );
 
@@ -675,14 +678,22 @@ export function createFrog(root: TgpuRoot) {
       }
 
       // Start leg transitions if they're too far from the body
-      if (leftLegTargetDist > MAX_TARGET_DISTANCE && prefersLeftLeg && !leftLegInTransition) {
+      if (
+        leftLegTargetDist > MAX_TARGET_DISTANCE &&
+        prefersLeftLeg &&
+        !leftLegInTransition
+      ) {
         rightLegPlaced = false;
         vec3.copy(leftLegTarget, leftLegPrevTarget);
         leftLegInTransition = true;
         leftLegTransitionTime = 0;
       }
 
-      if (rightLegTargetDist > MAX_TARGET_DISTANCE && prefersRightLeg && !rightLegInTransition) {
+      if (
+        rightLegTargetDist > MAX_TARGET_DISTANCE &&
+        prefersRightLeg &&
+        !rightLegInTransition
+      ) {
         rightLegPlaced = true;
         vec3.copy(rightLegTarget, rightLegPrevTarget);
         rightLegInTransition = true;
@@ -693,27 +704,37 @@ export function createFrog(root: TgpuRoot) {
       if (leftLegInTransition) {
         const t = leftLegTransitionTime / LEG_TRANSITION_DURATION;
         const smoothT = t * t * (3 - 2 * t); // Smooth step interpolation
-        
+
         // Linear interpolation between previous and new target
-        leftLegTarget.x = leftLegPrevTarget.x + (leftPick.x - leftLegPrevTarget.x) * smoothT;
-        leftLegTarget.z = leftLegPrevTarget.z + (leftPick.z - leftLegPrevTarget.z) * smoothT;
-        
+        leftLegTarget.x =
+          leftLegPrevTarget.x + (leftPick.x - leftLegPrevTarget.x) * smoothT;
+        leftLegTarget.z =
+          leftLegPrevTarget.z + (leftPick.z - leftLegPrevTarget.z) * smoothT;
+
         // Add foot lift using sine curve
         const liftAmount = Math.sin(t * Math.PI) * FOOT_LIFT_HEIGHT;
-        leftLegTarget.y = leftLegPrevTarget.y + (leftPick.y - leftLegPrevTarget.y) * smoothT + liftAmount;
+        leftLegTarget.y =
+          leftLegPrevTarget.y +
+          (leftPick.y - leftLegPrevTarget.y) * smoothT +
+          liftAmount;
       }
 
       if (rightLegInTransition) {
         const t = rightLegTransitionTime / LEG_TRANSITION_DURATION;
         const smoothT = t * t * (3 - 2 * t); // Smooth step interpolation
-        
+
         // Linear interpolation between previous and new target
-        rightLegTarget.x = rightLegPrevTarget.x + (rightPick.x - rightLegPrevTarget.x) * smoothT;
-        rightLegTarget.z = rightLegPrevTarget.z + (rightPick.z - rightLegPrevTarget.z) * smoothT;
-        
+        rightLegTarget.x =
+          rightLegPrevTarget.x + (rightPick.x - rightLegPrevTarget.x) * smoothT;
+        rightLegTarget.z =
+          rightLegPrevTarget.z + (rightPick.z - rightLegPrevTarget.z) * smoothT;
+
         // Add foot lift using sine curve
         const liftAmount = Math.sin(t * Math.PI) * FOOT_LIFT_HEIGHT;
-        rightLegTarget.y = rightLegPrevTarget.y + (rightPick.y - rightLegPrevTarget.y) * smoothT + liftAmount;
+        rightLegTarget.y =
+          rightLegPrevTarget.y +
+          (rightPick.y - rightLegPrevTarget.y) * smoothT +
+          liftAmount;
       }
 
       const leftLegPoints = solveIK(
