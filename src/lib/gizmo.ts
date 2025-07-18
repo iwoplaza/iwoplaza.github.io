@@ -1,9 +1,9 @@
+import type { TgpuRoot } from 'typegpu';
 import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
-import type { TgpuRoot } from 'typegpu';
-import { Shape } from './sdf.ts';
 import type { POV } from './camera.ts';
+import { Shape } from './sdf.ts';
 
 const MAX_GIZMOS = 1024;
 

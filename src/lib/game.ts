@@ -4,6 +4,7 @@ import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
 import { createOrbitCamera } from './camera.ts';
 import { createFrog } from './frog.ts';
+import { createGizmoState } from './gizmo.ts';
 import {
   AABB,
   AABBHit,
@@ -15,7 +16,6 @@ import {
   shapeUnion,
   sortHits,
 } from './sdf.ts';
-import { createGizmoState } from './gizmo.ts';
 
 const INSPECT = false;
 const pixelation = INSPECT ? 1 : 4;
@@ -511,11 +511,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       const alignedZ = touchInput.x * cameraSin + touchInput.z * cameraCos;
 
       // Set movement direction (normalized input, frog handles speed internally)
-      frog.movement = d.vec3f(
-        alignedX,
-        0,
-        alignedZ,
-      );
+      frog.movement = d.vec3f(alignedX, 0, alignedZ);
     }
 
     frog.update(dt);

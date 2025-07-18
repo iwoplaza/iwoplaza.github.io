@@ -3,7 +3,9 @@ import tgpu, { type TgpuRoot } from 'typegpu';
 import * as d from 'typegpu/data';
 import * as std from 'typegpu/std';
 import { mat3, mat4, quatn, vec3 } from 'wgpu-matrix';
+import { Gizmo } from './gizmo.ts';
 import { getRotationMatricesBetweenPoints, solveIK } from './ik.ts';
+import { Bone } from './rig.ts';
 import {
   opElongate,
   opSubtraction,
@@ -14,8 +16,6 @@ import {
   shapeUnion,
   smoothShapeUnion,
 } from './sdf.ts';
-import { Gizmo } from './gizmo.ts';
-import { Bone } from './rig.ts';
 
 // Palette
 // const skinColor = d.vec3f(0.3, 0.8, 0.4);
@@ -216,22 +216,20 @@ export function createFrog(root: TgpuRoot) {
   // IK target positions
   const leftArmTarget = d.vec3f(-1.8, 2, 1);
   const rightArmTarget = d.vec3f(1.8, 2, 1);
-  const leftLegTarget = d.vec3f(-0.6, 0, 0.1);
-  const rightLegTarget = d.vec3f(0.6, 0, 0.1);
+  const leftLegTarget = d.vec3f(-0.4, 0, 0);
+  const rightLegTarget = d.vec3f(0.4, 0, 0);
 
   // Maximum distance a target can be from the body before resetting
   const MAX_TARGET_DISTANCE = 0.6;
 
   // Movement tracking for rotation
-  const prevRootPos = d.vec3f();
-  const movementDirection = d.vec3f(0, 0, 1); // Default forward direction
   const velocity = d.vec3f(); // Current velocity
   const movement = d.vec3f(); // Desired movement direction and magnitude
 
   // Rotation parameters
   const HEAD_ROTATION_SPEED = 8.0; // How quickly the head turns to face movement
   const BODY_ROTATION_SPEED = 7; // How quickly the body follows the head (slower for follow-through)
-  const MIN_MOVEMENT_THRESHOLD = 0.001; // Minimum movement required to change direction
+  const MIN_MOVEMENT_THRESHOLD = 0.01; // Minimum movement required to change direction
 
   // Movement parameters
   const MAX_SPEED = 8; // Maximum movement speed
@@ -239,11 +237,12 @@ export function createFrog(root: TgpuRoot) {
   const DECELERATION = 15; // How quickly velocity decelerates when no input
 
   // Arm animation parameters
+  const INITIAL_ARM_ANIMATION_PHASE = 0; // Initial phase of the arm animation
   const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
   const ARM_MAX_AMPLITUDE = 1; // Maximum amplitude when moving at full speed
   const BASE_ARM_ANIMATION_SPEED = 2.5; // Base speed of the figure-8 animation
-  const ARM_ANIMATION_SPEED = 1.1; // Speed of the figure-8 animation
-  let armAnimationPhase = 0.0; // Current phase of the arm animation
+  const ARM_ANIMATION_SPEED = 9; // Speed of the figure-8 animation
+  let armAnimationPhase = INITIAL_ARM_ANIMATION_PHASE; // Current phase of the arm animation
 
   let progress = 0;
   let rootYaw = 0;
@@ -370,30 +369,17 @@ export function createFrog(root: TgpuRoot) {
       progress += dt;
 
       // Calculate target velocity from movement input
-      const targetVelocity = d.vec3f(
-        movement.x * MAX_SPEED,
-        movement.y * MAX_SPEED,
-        movement.z * MAX_SPEED,
-      );
+      const targetVelocity = std.mul(movement, MAX_SPEED);
 
       // Smoothly interpolate velocity towards target
-      const movementMagnitude = Math.sqrt(
-        movement.x * movement.x +
-          movement.y * movement.y +
-          movement.z * movement.z,
-      );
+      const velocityDiff = std.sub(targetVelocity, velocity);
       const accelerationRate =
-        movementMagnitude > 0.001 ? ACCELERATION : DECELERATION;
+        std.length(movement) > 0.001 ? ACCELERATION : DECELERATION;
 
-      const velocityDiff = d.vec3f(
-        targetVelocity.x - velocity.x,
-        targetVelocity.y - velocity.y,
-        targetVelocity.z - velocity.z,
+      vec3.copy(
+        std.add(velocity, std.mul(velocityDiff, accelerationRate * dt)),
+        velocity,
       );
-
-      velocity.x += velocityDiff.x * accelerationRate * dt;
-      velocity.y += velocityDiff.y * accelerationRate * dt;
-      velocity.z += velocityDiff.z * accelerationRate * dt;
 
       // Apply velocity to position
       rootPos.x += velocity.x * dt;
@@ -401,21 +387,21 @@ export function createFrog(root: TgpuRoot) {
       rootPos.z += velocity.z * dt;
 
       // Calculate movement direction
-      const moveX = rootPos.x - prevRootPos.x;
-      const moveZ = rootPos.z - prevRootPos.z;
-      const moveMagnitude =
-        Math.sqrt(moveX * moveX + moveZ * moveZ) / Math.max(0.001, dt);
+      const moveMagnitude = std.length(velocity.xz) / MAX_SPEED;
 
-      // Progress the arm animation phase based on movement velocity
-      // When moving faster, the arms should swing more rapidly
-      // When stationary, they should still have a subtle movement
-      const velocityPhaseBoost =
-        BASE_ARM_ANIMATION_SPEED + moveMagnitude * ARM_ANIMATION_SPEED;
-      armAnimationPhase += velocityPhaseBoost * dt;
+      if (moveMagnitude < 0.01) {
+        armAnimationPhase = INITIAL_ARM_ANIMATION_PHASE; // Reset to initial phase when stationary
+      } else {
+        // Progress the arm animation phase based on movement velocity
+        // When moving faster, the arms should swing more rapidly
+        const velocityPhaseBoost =
+          BASE_ARM_ANIMATION_SPEED + moveMagnitude * ARM_ANIMATION_SPEED;
+        armAnimationPhase += velocityPhaseBoost * dt;
 
-      // Keep the phase within a reasonable range to avoid floating point issues
-      if (armAnimationPhase > Math.PI * 2) {
-        armAnimationPhase -= Math.PI * 2;
+        // Keep the phase within a reasonable range to avoid floating point issues
+        if (armAnimationPhase > Math.PI * 2) {
+          armAnimationPhase -= Math.PI * 2;
+        }
       }
 
       // Calculate the figure-8 pattern
@@ -423,37 +409,22 @@ export function createFrog(root: TgpuRoot) {
       const figure8X = Math.sin(armAnimationPhase);
       const figure8Y = Math.sin(armAnimationPhase * 2 - 0.5) * 0.5; // Vertical component of figure-8
 
-      // Scale the amplitude based on movement velocity
-      // Map movement magnitude to a 0-1 range for amplitude scaling
-      // Use a minimum threshold to ensure some movement even when nearly stationary
-      const velocityFactor = std.clamp(moveMagnitude * 0.2, 0.01, 1); // Scale up for better response
       const armAmplitude =
         ARM_FIGURE8_BASE_AMPLITUDE +
-        (ARM_MAX_AMPLITUDE - ARM_FIGURE8_BASE_AMPLITUDE) * velocityFactor;
+        (ARM_MAX_AMPLITUDE - ARM_FIGURE8_BASE_AMPLITUDE) * moveMagnitude;
 
       // Update movement direction if there is significant movement
-      if (moveMagnitude > MIN_MOVEMENT_THRESHOLD) {
-        movementDirection.x = moveX / moveMagnitude;
-        movementDirection.z = moveZ / moveMagnitude;
-
+      if (std.length(movement) > MIN_MOVEMENT_THRESHOLD) {
         // Calculate target yaw angle from movement direction (atan2 gives angle in radians)
-        targetHeadYaw = Math.atan2(movementDirection.x, movementDirection.z);
+        targetHeadYaw = Math.atan2(movement.x, movement.z);
 
         // Add a slight tilt to the body in the direction of movement
-        bodyPitch = moveMagnitude * 0.03;
+        bodyPitch = moveMagnitude * 0.2;
+        headPitch = 0;
       } else {
         // When not moving, return to a natural idle animation
         headPitch = Math.sin(progress * 2) * 0.1;
       }
-
-      // Smoothly rotate head toward target direction
-      const headBodyYawDiff = targetHeadYaw - bodyYaw;
-
-      // Normalize the angle difference to be between -PI and PI
-      const normHeadHeadYawDiff = Math.atan2(
-        Math.sin(headBodyYawDiff),
-        Math.cos(headBodyYawDiff),
-      );
 
       // Smoothly rotate head toward target direction
       const headYawDiff = targetHeadYaw - headYaw;
@@ -489,11 +460,6 @@ export function createFrog(root: TgpuRoot) {
       leftFootYaw = rootYaw;
       rightFootYaw = rootYaw;
 
-      // Store current position for next frame's movement calculation
-      prevRootPos.x = rootPos.x;
-      prevRootPos.y = rootPos.y;
-      prevRootPos.z = rootPos.z;
-
       // BODY
       body.pos.x = rootPos.x;
       body.pos.y =
@@ -527,14 +493,7 @@ export function createFrog(root: TgpuRoot) {
         d.vec3f(),
       );
 
-      // Check if arm targets are too far from body and reset if needed
-      const bodyGlobalPos = vec3.transformMat4(
-        d.vec3f(0, 0, 0),
-        body.mat,
-        d.vec3f(),
-      );
-
-      const baseArmOffset = 1.5 + 0.5 * velocityFactor;
+      const baseArmOffset = 1.5 + 0.5 * moveMagnitude;
 
       // Left arm target - positioned to the left side of the body
       vec3.copy(
@@ -633,7 +592,7 @@ export function createFrog(root: TgpuRoot) {
         (armAnimationPhase / (Math.PI * 2) + 0.2) % 1 > 0.5 && rightLegPlaced;
       let prefersRightLeg =
         (armAnimationPhase / (Math.PI * 2) + 0.2) % 1 < 0.5 && !rightLegPlaced;
-      if (velocityFactor < 0.1) {
+      if (moveMagnitude < 0.1) {
         // We care less about placing steps in synchronicity
         prefersLeftLeg = true;
         prefersRightLeg = true;
@@ -642,7 +601,7 @@ export function createFrog(root: TgpuRoot) {
       const leftPick = std.add(
         rootPos,
         std.add(
-          std.mul(headForward, 0.2 + 1.4 * velocityFactor),
+          std.mul(headForward, 0.2 + 1.4 * moveMagnitude),
           std.mul(headRight, -0.4),
         ),
       );
@@ -651,7 +610,7 @@ export function createFrog(root: TgpuRoot) {
       const rightPick = std.add(
         rootPos,
         std.add(
-          std.mul(headForward, 0.2 + 1.4 * velocityFactor),
+          std.mul(headForward, 0.2 + 1.4 * moveMagnitude),
           std.mul(headRight, 0.4),
         ),
       );
@@ -681,7 +640,8 @@ export function createFrog(root: TgpuRoot) {
       if (
         leftLegTargetDist > MAX_TARGET_DISTANCE &&
         prefersLeftLeg &&
-        !leftLegInTransition
+        !leftLegInTransition &&
+        !rightLegInTransition
       ) {
         rightLegPlaced = false;
         vec3.copy(leftLegTarget, leftLegPrevTarget);
@@ -692,6 +652,7 @@ export function createFrog(root: TgpuRoot) {
       if (
         rightLegTargetDist > MAX_TARGET_DISTANCE &&
         prefersRightLeg &&
+        !leftLegInTransition &&
         !rightLegInTransition
       ) {
         rightLegPlaced = true;

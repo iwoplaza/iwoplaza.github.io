@@ -38,7 +38,7 @@ export function createOrbitCamera(
   const smoothingFactor = 0.1;
   // Maximum overshoot distance
   const maxOvershoot = 2.0;
-  
+
   // Yaw and pitch angles facing the origin.
   let orbitRadius = options.radius;
   let orbitYaw = options.yaw;
@@ -164,52 +164,55 @@ export function createOrbitCamera(
     prevTargetPosition.x = targetPosition.x;
     prevTargetPosition.y = targetPosition.y;
     prevTargetPosition.z = targetPosition.z;
-    
+
     // Update target position
     targetPosition.x = newPosition.x;
     targetPosition.y = newPosition.y;
     targetPosition.z = newPosition.z;
-    
+
     // Calculate movement direction and magnitude
     movementDirection.x = targetPosition.x - prevTargetPosition.x;
     movementDirection.y = targetPosition.y - prevTargetPosition.y;
     movementDirection.z = targetPosition.z - prevTargetPosition.z;
-    
+
     const movementMagnitude = Math.sqrt(
-      movementDirection.x * movementDirection.x + 
-      movementDirection.y * movementDirection.y + 
-      movementDirection.z * movementDirection.z
+      movementDirection.x * movementDirection.x +
+        movementDirection.y * movementDirection.y +
+        movementDirection.z * movementDirection.z,
     );
-    
+
     // Normalize movement direction if there is movement
     if (movementMagnitude > 0.001) {
       movementDirection.x /= movementMagnitude;
       movementDirection.y /= movementMagnitude;
       movementDirection.z /= movementMagnitude;
-      
+
       // Calculate desired offset with overshooting based on movement speed
       const desiredOffset = {
         x: movementDirection.x * Math.min(movementMagnitude * 2, maxOvershoot),
         y: 0, // Keep vertical position stable
-        z: movementDirection.z * Math.min(movementMagnitude * 2, maxOvershoot)
+        z: movementDirection.z * Math.min(movementMagnitude * 2, maxOvershoot),
       };
-      
+
       // Smoothly interpolate current offset towards desired offset
-      currentOffset.x += (desiredOffset.x - currentOffset.x) * smoothingFactor * dt * 10;
-      currentOffset.y += (desiredOffset.y - currentOffset.y) * smoothingFactor * dt * 10;
-      currentOffset.z += (desiredOffset.z - currentOffset.z) * smoothingFactor * dt * 10;
+      currentOffset.x +=
+        (desiredOffset.x - currentOffset.x) * smoothingFactor * dt * 10;
+      currentOffset.y +=
+        (desiredOffset.y - currentOffset.y) * smoothingFactor * dt * 10;
+      currentOffset.z +=
+        (desiredOffset.z - currentOffset.z) * smoothingFactor * dt * 10;
     } else {
       // If not moving, gradually reduce the offset
-      currentOffset.x *= (1 - smoothingFactor * dt * 5);
-      currentOffset.y *= (1 - smoothingFactor * dt * 5);
-      currentOffset.z *= (1 - smoothingFactor * dt * 5);
+      currentOffset.x *= 1 - smoothingFactor * dt * 5;
+      currentOffset.y *= 1 - smoothingFactor * dt * 5;
+      currentOffset.z *= 1 - smoothingFactor * dt * 5;
     }
-    
+
     // Update orbit origin with target position plus offset
     orbitOrigin.x = targetPosition.x + currentOffset.x;
     orbitOrigin.y = targetPosition.y + 3; // Keep camera looking slightly above the target
     orbitOrigin.z = targetPosition.z + currentOffset.z;
-    
+
     // Update the camera view
     updateOrbit(0, 0);
   }
