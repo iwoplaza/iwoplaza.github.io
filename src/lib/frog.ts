@@ -599,7 +599,7 @@ export function createFrog(root: TgpuRoot) {
       }
 
       const leftPick = std.add(
-        rootPos,
+        d.vec3f(rootPos.x, 0, rootPos.z),
         std.add(
           std.mul(headForward, 0.2 + 1.4 * moveMagnitude),
           std.mul(headRight, -0.4),
@@ -608,7 +608,7 @@ export function createFrog(root: TgpuRoot) {
 
       // Position in front of the body
       const rightPick = std.add(
-        rootPos,
+        d.vec3f(rootPos.x, 0, rootPos.z),
         std.add(
           std.mul(headForward, 0.2 + 1.4 * moveMagnitude),
           std.mul(headRight, 0.4),

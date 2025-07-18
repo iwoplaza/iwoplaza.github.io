@@ -51,7 +51,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   canvas.addEventListener('touchstart', (event: TouchEvent) => {
     event.preventDefault();
-    event.stopPropagation();
     if (!INSPECT && event.touches.length === 1) {
       isTouchActive = true;
       touchStartX = event.touches[0].clientX;
@@ -61,7 +60,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   canvas.addEventListener('touchmove', (event: TouchEvent) => {
     event.preventDefault();
-    event.stopPropagation();
     if (!INSPECT && isTouchActive && event.touches.length === 1) {
       const touch = event.touches[0];
       const deltaX = -touch.clientX + touchStartX;
@@ -90,7 +88,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   canvas.addEventListener('touchend', (event: TouchEvent) => {
     event.preventDefault();
-    event.stopPropagation();
     if (!INSPECT && event.touches.length === 0) {
       isTouchActive = false;
       touchInput.x = 0;
@@ -105,7 +102,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   canvas.addEventListener('mousedown', (event) => {
     event.preventDefault();
-    event.stopPropagation();
     if (!INSPECT && event.button === 0) {
       isMouseDown = true;
       mouseStartX = event.clientX;
@@ -115,7 +111,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   canvas.addEventListener('mousemove', (event) => {
     event.preventDefault();
-    event.stopPropagation();
     if (!INSPECT && isMouseDown) {
       const deltaX = -event.clientX + mouseStartX;
       const deltaY = event.clientY - mouseStartY;
@@ -143,7 +138,6 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   canvas.addEventListener('mouseup', (event) => {
     event.preventDefault();
-    event.stopPropagation();
     if (!INSPECT && event.button === 0) {
       isMouseDown = false;
       touchInput.x = 0;
@@ -454,8 +448,8 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     // AABB for the frog
     aabbs[0] = AABB({
-      min: d.vec3f(-2, 0, -2), // Approximate bounds
-      max: d.vec3f(2, 7, 2),
+      min: std.add(frog.position, d.vec3f(-2, -1, -2)), // Approximate bounds
+      max: std.add(frog.position, d.vec3f(2, 7, 2)),
     });
 
     // AABB for the floor
@@ -494,11 +488,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     // Update frog position based on input
     if (INSPECT) {
       // In inspect mode, keep the circular motion
-      const circleRadius = 3;
-      const circleSpeed = 0.5;
-      const frogX = Math.cos(timestamp * 0.001 * circleSpeed) * circleRadius;
-      const frogZ = Math.sin(timestamp * 0.001 * circleSpeed) * circleRadius;
-      frog.position = d.vec3f(frogX, 0, frogZ);
+      const circleSpeed = 2;
+      const frogX = Math.cos(timestamp * 0.001 * circleSpeed) * 0.5;
+      const frogY = Math.sin(timestamp * 0.001 * circleSpeed) * 0.3 + -0.2;
+      frog.position = d.vec3f(frogX, frogY, 0);
     } else {
       // In game mode, use touch/mouse input
       // Apply camera rotation to the raw touch input
