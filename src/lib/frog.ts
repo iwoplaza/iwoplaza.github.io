@@ -17,11 +17,15 @@ import {
   smoothShapeUnion,
 } from './sdf.ts';
 
-// Palette
-// const skinColor = d.vec3f(0.3, 0.8, 0.4);
+// Palette - Green
+// const skinColor = d.vec3f(0.25, 0.7, 0.3);
 // const backpackColor = d.vec3f(0.4, 0.4, 0.1);
+// Palette - Striking
 const skinColor = d.vec3f(0.8, 0.6, 0.2);
-const backpackColor = d.vec3f(0.2, 0.4, 0.6);
+const backpackColor = d.vec3f(0);
+// Palette - Orange
+// const skinColor = d.vec3f(0.8, 0.6, 0.2);
+// const backpackColor = d.vec3f(0.2, 0.4, 0.6);
 
 const getFrogHead = tgpu.fn(
   [d.vec3f],
@@ -417,14 +421,11 @@ export function createFrog(root: TgpuRoot) {
       if (std.length(movement) > MIN_MOVEMENT_THRESHOLD) {
         // Calculate target yaw angle from movement direction (atan2 gives angle in radians)
         targetHeadYaw = Math.atan2(movement.x, movement.z);
-
-        // Add a slight tilt to the body in the direction of movement
-        bodyPitch = moveMagnitude * 0.2;
-        headPitch = 0;
-      } else {
-        // When not moving, return to a natural idle animation
-        headPitch = Math.sin(progress * 2) * 0.1;
       }
+
+      // Add a slight tilt to the body in the direction of movement
+      bodyPitch = moveMagnitude * 0.2;
+      headPitch = Math.sin(progress * 2) * 0.1;
 
       // Smoothly rotate head toward target direction
       const headYawDiff = targetHeadYaw - headYaw;

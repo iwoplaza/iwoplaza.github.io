@@ -1,3 +1,4 @@
+import { perlin2d } from '@typegpu/noise';
 import { sdPlane } from '@typegpu/sdf';
 import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
@@ -18,7 +19,7 @@ import {
 } from './sdf.ts';
 
 const INSPECT = false;
-const pixelation = INSPECT ? 1 : 4;
+const pixelation = INSPECT ? 1 : 2;
 const gameCameraOptions = {
   radius: 6,
   yaw: -Math.PI / 4,
@@ -252,25 +253,34 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   const frog = createFrog(root);
   const gizmoState = createGizmoState(root, camera.pov);
 
+  /**
+   * Used to track the min-distance from the frog character recorded during ray marching.
+   * Can be used to apply outline effects or other post-processing.
+   */
+  const frogDistance = tgpu['~unstable'].privateVar(d.f32, MAX_DIST);
+
   const getSceneDist = tgpu.fn(
     [d.vec3f],
     Shape,
   )((p) => {
     const frogShape = frog.getFrog(p);
-    const tree = getPineTree(p);
+    frogDistance.value = std.min(frogShape.dist, frogDistance.value);
+
+    // const tree = getPineTree(p);
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
       color: std.mix(
-        d.vec3f(0.3, 0.8, 0.4),
+        d.vec3f(0.25, 0.65, 0.35),
         d.vec3f(0.2, 0.6, 0.3),
-        checkerBoard(std.mul(p.xz, 0.5)),
+        checkerBoard(std.mul(p.xz, 0.3)),
       ),
+      // color: d.vec3f(0.15, 0.4, 0.2),
     });
 
     let scene = floor;
-    if (!INSPECT) {
-      scene = shapeUnion(scene, tree);
-    }
+    // if (!INSPECT) {
+    //   scene = shapeUnion(scene, tree);
+    // }
     scene = shapeUnion(scene, frogShape);
     return scene;
   });
@@ -396,14 +406,24 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       std.mul(camera.pov.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz,
     );
 
+    frogDistance.value = MAX_DIST;
     const march = rayMarch(ro, rd);
+    const frogDist = frogDistance.value;
+
+    const thickness =
+      perlin2d.sample(std.mul(std.add(input.uv, std.floor(time.$ * 4)), 60)) *
+        0.07 +
+      0.05;
+    if (std.abs(frogDist - 0.2) < thickness) {
+      return d.vec4f(0, 0, 0, 1);
+    }
 
     const p = std.add(ro, std.mul(rd, march.dist));
     const n = getNormal(p);
 
-    // Lighting with orbiting light
-    const l = std.normalize(d.vec3f(0.2, 1, 1));
-    const diff = std.max(std.dot(n, l), 0);
+    const l = std.normalize(d.vec3f(-0.5, 1, 1));
+    // const diff = std.max(std.dot(n, l), 0);
+    const diff = std.select(d.f32(0), d.f32(1), std.dot(n, l) > 0);
 
     // Soft shadows
     const shadowRo = p;
@@ -412,10 +432,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     // Can be concrete with a point light, but with a directional
     // light, it's a limit
     const shadowDist = d.f32(32);
-    const shadow = softShadow(shadowRo, shadowRd, 0.1, shadowDist, 16);
+    const shadow = softShadow(shadowRo, shadowRd, 0.1, shadowDist, 100);
 
     // Combine lighting with shadows and color
-    const litColor = std.mul(march.color, 0.3 + std.min(diff, shadow) * 0.7);
+    const litColor = std.mul(march.color, 0.6 + std.min(diff, shadow) * 0.4);
 
     if (march.dist >= MAX_DIST) {
       return skyColor;
@@ -458,13 +478,13 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       max: d.vec3f(100, 0, 100),
     });
 
-    if (!INSPECT) {
-      // AABB for the infinite repeating trees
-      aabbs[2] = AABB({
-        min: d.vec3f(-100, 0, -100),
-        max: d.vec3f(100, 16, 100),
-      });
-    }
+    // if (!INSPECT) {
+    //   // AABB for the infinite repeating trees
+    //   aabbs[2] = AABB({
+    //     min: d.vec3f(-100, 0, -100),
+    //     max: d.vec3f(100, 16, 100),
+    //   });
+    // }
 
     // Update the uniforms
     sceneAABBs.write(aabbs);
@@ -488,9 +508,9 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     // Update frog position based on input
     if (INSPECT) {
       // In inspect mode, keep the circular motion
-      const circleSpeed = 2;
-      const frogX = Math.cos(timestamp * 0.001 * circleSpeed) * 0.5;
-      const frogY = Math.sin(timestamp * 0.001 * circleSpeed) * 0.3 + -0.2;
+      const circleSpeed = 1;
+      const frogX = Math.cos(timestamp * 0.001 * circleSpeed) * 0.1;
+      const frogY = Math.sin(timestamp * 0.001 * circleSpeed * 2) * 0.2 + -0.2;
       frog.position = d.vec3f(frogX, frogY, 0);
     } else {
       // In game mode, use touch/mouse input
