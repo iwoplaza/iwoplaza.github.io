@@ -18,14 +18,14 @@ import {
 } from './sdf.ts';
 
 // Palette - Green
-// const skinColor = d.vec3f(0.25, 0.7, 0.3);
-// const backpackColor = d.vec3f(0.4, 0.4, 0.1);
+const skinColor = d.vec3f(0.25, 0.7, 0.3);
+const backpackColor = d.vec3f(0.4, 0.4, 0.1);
 // Palette - Striking
 // const skinColor = d.vec3f(0.8, 0.6, 0.2);
 // const backpackColor = d.vec3f(0);
 // Palette - Orange
-const skinColor = d.vec3f(0.8, 0.6, 0.2);
-const backpackColor = d.vec3f(0.2, 0.4, 0.6);
+// const skinColor = d.vec3f(0.8, 0.6, 0.2);
+// const backpackColor = d.vec3f(0.2, 0.4, 0.6);
 
 const getFrogHead = tgpu.fn(
   [d.vec3f],

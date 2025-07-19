@@ -277,8 +277,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
       color: std.mul(
-        // d.vec3f(0.2, 0.3, 0.6),
-        d.vec3f(0.2, 0.6, 0.3),
+        d.vec3f(0.2, 0.3, 0.6),
         0.9 + checkerBoard(std.mul(p.xz, 0.3)) * 0.1,
       ),
     });
