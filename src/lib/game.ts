@@ -44,13 +44,26 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   );
   camera.active = INSPECT;
 
-  // Touch input for frog movement (when not in INSPECT mode)
+  // Input for frog movement (when not in INSPECT mode)
   const touchInput = { x: 0, z: 0 };
+  const keyboardInput = { x: 0, z: 0 };
   let isTouchActive = false;
 
   // Touch controls for frog movement
   let touchStartX = 0;
   let touchStartY = 0;
+
+  // Keyboard input state
+  const keys = {
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    ArrowUp: false,
+    ArrowLeft: false,
+    ArrowDown: false,
+    ArrowRight: false,
+  };
 
   // Mouse controls for desktop
   let isMouseDown = false;
@@ -243,6 +256,44 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     },
     { passive: false },
   );
+
+  // Keyboard controls
+  const updateKeyboardInput = () => {
+    let x = 0;
+    let z = 0;
+
+    // WASD controls
+    if (keys.a || keys.ArrowLeft) x += 1;
+    if (keys.d || keys.ArrowRight) x -= 1;
+    if (keys.w || keys.ArrowUp) z -= 1;
+    if (keys.s || keys.ArrowDown) z += 1;
+
+    // Normalize diagonal movement to maintain consistent speed
+    const magnitude = Math.sqrt(x * x + z * z);
+    if (magnitude > 1) {
+      keyboardInput.x = x / magnitude;
+      keyboardInput.z = z / magnitude;
+    } else {
+      keyboardInput.x = x;
+      keyboardInput.z = z;
+    }
+  };
+
+  window.addEventListener('keydown', (event) => {
+    if (!INSPECT && event.key in keys) {
+      event.preventDefault();
+      keys[event.key as keyof typeof keys] = true;
+      updateKeyboardInput();
+    }
+  });
+
+  window.addEventListener('keyup', (event) => {
+    if (!INSPECT && event.key in keys) {
+      event.preventDefault();
+      keys[event.key as keyof typeof keys] = false;
+      updateKeyboardInput();
+    }
+  });
 
   // Create uniform for AABBs
   const sceneAABBs = root.createUniform(d.arrayOf(AABB, MAX_AABBS));
@@ -627,15 +678,27 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       const frogY = Math.sin(timestamp * 0.001 * circleSpeed * 2) * 0.2 + -0.2;
       frog.position = d.vec3f(frogX, frogY, 0);
     } else {
-      // In game mode, use touch/mouse input
-      // Apply camera rotation to the raw touch input
+      // In game mode, combine keyboard and touch/mouse input
+      let combinedX = touchInput.x + keyboardInput.x;
+      let combinedZ = touchInput.z + keyboardInput.z;
+
+      // Normalize combined input to prevent faster movement when using both inputs
+      const combinedMagnitude = Math.sqrt(
+        combinedX * combinedX + combinedZ * combinedZ,
+      );
+      if (combinedMagnitude > 1) {
+        combinedX /= combinedMagnitude;
+        combinedZ /= combinedMagnitude;
+      }
+
+      // Apply camera rotation to the combined input
       const cameraYaw = camera.orbitYaw;
       const cameraCos = Math.cos(cameraYaw);
       const cameraSin = Math.sin(cameraYaw);
 
       // Calculate input relative to camera orientation
-      const alignedX = touchInput.x * cameraCos - touchInput.z * cameraSin;
-      const alignedZ = touchInput.x * cameraSin + touchInput.z * cameraCos;
+      const alignedX = combinedX * cameraCos - combinedZ * cameraSin;
+      const alignedZ = combinedX * cameraSin + combinedZ * cameraCos;
 
       // Set movement direction (normalized input, frog handles speed internally)
       frog.movement = d.vec3f(alignedX, 0, alignedZ);
