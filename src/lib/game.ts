@@ -33,7 +33,6 @@ const inspectCameraOptions = {
 };
 
 export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
-  const mainElement = document.querySelector('main') as HTMLElement;
   const root = await tgpu.init();
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
@@ -115,147 +114,52 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     }
   });
 
-  // Fullscreen functionality
-  const closeButton = document.getElementById(
-    'close-fullscreen',
-  ) as HTMLButtonElement;
-
-  const enterFullscreen = () => {
-    interface FullscreenElement extends HTMLCanvasElement {
-      webkitRequestFullscreen?: () => Promise<void>;
-      msRequestFullscreen?: () => Promise<void>;
-    }
-
-    const element = mainElement as FullscreenElement;
-    if (element.requestFullscreen) {
-      element.requestFullscreen();
-    } else if (element.webkitRequestFullscreen) {
-      element.webkitRequestFullscreen();
-    } else if (element.msRequestFullscreen) {
-      element.msRequestFullscreen();
-    }
-  };
-
-  const exitFullscreen = () => {
-    interface FullscreenDocument extends Document {
-      webkitExitFullscreen?: () => Promise<void>;
-      msExitFullscreen?: () => Promise<void>;
-    }
-
-    const doc = document as FullscreenDocument;
-    if (doc.exitFullscreen) {
-      doc.exitFullscreen();
-    } else if (doc.webkitExitFullscreen) {
-      doc.webkitExitFullscreen();
-    } else if (doc.msExitFullscreen) {
-      doc.msExitFullscreen();
-    }
-  };
-
-  const updateCloseButtonVisibility = () => {
-    if (document.fullscreenElement) {
-      closeButton.classList.remove('hidden');
-    } else {
-      closeButton.classList.add('hidden');
-    }
-  };
-
-  // Listen for fullscreen changes to show/hide close button
-  document.addEventListener('fullscreenchange', updateCloseButtonVisibility);
-  document.addEventListener(
-    'webkitfullscreenchange',
-    updateCloseButtonVisibility,
-  );
-  document.addEventListener('msfullscreenchange', updateCloseButtonVisibility);
-
-  // Close button click handler
-  closeButton.addEventListener('click', (event) => {
+  // Touch controls
+  canvas.addEventListener('touchstart', (event: TouchEvent) => {
     event.preventDefault();
-    event.stopPropagation();
-    exitFullscreen();
-  });
-
-  // Add click handler for fullscreen (separate from movement controls)
-  mainElement.addEventListener('click', (event) => {
-    event.preventDefault();
-    if (!document.fullscreenElement) {
-      enterFullscreen();
+    if (!INSPECT && event.touches.length === 1) {
+      isTouchActive = true;
+      touchStartX = event.touches[0].clientX;
+      touchStartY = event.touches[0].clientY;
     }
   });
 
-  // Add touch handler for fullscreen on mobile (using tap detection)
-  let touchStartTime = 0;
-  let touchMoved = false;
+  canvas.addEventListener('touchmove', (event: TouchEvent) => {
+    event.preventDefault();
+    if (!INSPECT && isTouchActive && event.touches.length === 1) {
+      const touch = event.touches[0];
+      const deltaX = -touch.clientX + touchStartX;
+      const deltaY = touch.clientY - touchStartY;
 
-  canvas.addEventListener(
-    'touchstart',
-    (event: TouchEvent) => {
-      event.preventDefault();
-      touchStartTime = Date.now();
-      touchMoved = false;
+      // Convert to joystick input (-1 to 1 range)
+      const sensitivity = 0.01;
 
-      if (!INSPECT && event.touches.length === 1) {
-        isTouchActive = true;
-        touchStartX = event.touches[0].clientX;
-        touchStartY = event.touches[0].clientY;
+      // Calculate raw input values
+      const rawX = deltaX * sensitivity;
+      const rawZ = deltaY * sensitivity;
+
+      // Calculate magnitude of the input vector
+      const magnitude = Math.sqrt(rawX * rawX + rawZ * rawZ);
+
+      // Normalize if magnitude exceeds 1 to ensure consistent max speed in all directions
+      if (magnitude > 1) {
+        touchInput.x = rawX / magnitude;
+        touchInput.z = rawZ / magnitude;
+      } else {
+        touchInput.x = rawX;
+        touchInput.z = rawZ;
       }
-    },
-    { passive: false },
-  );
+    }
+  });
 
-  canvas.addEventListener(
-    'touchmove',
-    (event: TouchEvent) => {
-      event.preventDefault();
-      touchMoved = true;
-
-      if (!INSPECT && isTouchActive && event.touches.length === 1) {
-        const touch = event.touches[0];
-        const deltaX = -touch.clientX + touchStartX;
-        const deltaY = touch.clientY - touchStartY;
-
-        // Convert to joystick input (-1 to 1 range)
-        const sensitivity = 0.01;
-
-        // Calculate raw input values
-        const rawX = deltaX * sensitivity;
-        const rawZ = deltaY * sensitivity;
-
-        // Calculate magnitude of the input vector
-        const magnitude = Math.sqrt(rawX * rawX + rawZ * rawZ);
-
-        // Normalize if magnitude exceeds 1 to ensure consistent max speed in all directions
-        if (magnitude > 1) {
-          touchInput.x = rawX / magnitude;
-          touchInput.z = rawZ / magnitude;
-        } else {
-          touchInput.x = rawX;
-          touchInput.z = rawZ;
-        }
-      }
-    },
-    { passive: false },
-  );
-
-  canvas.addEventListener(
-    'touchend',
-    (event: TouchEvent) => {
-      event.preventDefault();
-      const touchDuration = Date.now() - touchStartTime;
-
-      // If it was a quick tap (< 200ms) and didn't move much, trigger fullscreen
-      if (!touchMoved && touchDuration < 200 && !document.fullscreenElement) {
-        enterFullscreen();
-      }
-
-      if (!INSPECT && event.touches.length === 0) {
-        isTouchActive = false;
-        touchInput.x = 0;
-        touchInput.z = 0;
-      }
-    },
-    { passive: false },
-  );
+  canvas.addEventListener('touchend', (event: TouchEvent) => {
+    event.preventDefault();
+    if (!INSPECT && event.touches.length === 0) {
+      isTouchActive = false;
+      touchInput.x = 0;
+      touchInput.z = 0;
+    }
+  });
 
   // Keyboard controls
   const updateKeyboardInput = () => {
