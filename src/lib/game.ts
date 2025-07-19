@@ -54,10 +54,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
   // Keyboard input state
   const keys = {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
+    KeyW: false,
+    KeyA: false,
+    KeyS: false,
+    KeyD: false,
     ArrowUp: false,
     ArrowLeft: false,
     ArrowDown: false,
@@ -167,10 +167,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     let z = 0;
 
     // WASD controls
-    if (keys.a || keys.ArrowLeft) x += 1;
-    if (keys.d || keys.ArrowRight) x -= 1;
-    if (keys.w || keys.ArrowUp) z -= 1;
-    if (keys.s || keys.ArrowDown) z += 1;
+    if (keys.KeyA || keys.ArrowLeft) x += 1;
+    if (keys.KeyD || keys.ArrowRight) x -= 1;
+    if (keys.KeyW || keys.ArrowUp) z -= 1;
+    if (keys.KeyS || keys.ArrowDown) z += 1;
 
     // Normalize diagonal movement to maintain consistent speed
     const magnitude = Math.sqrt(x * x + z * z);
@@ -184,17 +184,17 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
   };
 
   window.addEventListener('keydown', (event) => {
-    if (!INSPECT && event.key in keys) {
+    if (!INSPECT && event.code in keys) {
       event.preventDefault();
-      keys[event.key as keyof typeof keys] = true;
+      keys[event.code as keyof typeof keys] = true;
       updateKeyboardInput();
     }
   });
 
   window.addEventListener('keyup', (event) => {
-    if (!INSPECT && event.key in keys) {
+    if (!INSPECT && event.code in keys) {
       event.preventDefault();
-      keys[event.key as keyof typeof keys] = false;
+      keys[event.code as keyof typeof keys] = false;
       updateKeyboardInput();
     }
   });
@@ -473,7 +473,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       std.add(std.mul(input.uv, camera.pov.$.aspect), std.floor(time.$ * 4)),
       50,
     );
-    const thickness = perlin2d.sample(outlineDispUV) * 0.15 + 0.15;
+    const thickness = perlin2d.sample(outlineDispUV) * 0.15 + 0.2;
     const dropShadowR = 0.3;
     const dropShadowT = std.select(
       0,
