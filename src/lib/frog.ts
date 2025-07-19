@@ -18,11 +18,11 @@ import {
 } from './sdf.ts';
 
 // Palette - Green
-// const skinColor = d.vec3f(0.25, 0.7, 0.3);
-// const backpackColor = d.vec3f(0.4, 0.4, 0.1);
+const skinColor = d.vec3f(0.25, 0.7, 0.3);
+const backpackColor = d.vec3f(0.4, 0.4, 0.1);
 // Palette - Striking
-const skinColor = d.vec3f(0.8, 0.6, 0.2);
-const backpackColor = d.vec3f(0);
+// const skinColor = d.vec3f(0.8, 0.6, 0.2);
+// const backpackColor = d.vec3f(0);
 // Palette - Orange
 // const skinColor = d.vec3f(0.8, 0.6, 0.2);
 // const backpackColor = d.vec3f(0.2, 0.4, 0.6);
@@ -224,7 +224,7 @@ export function createFrog(root: TgpuRoot) {
   const rightLegTarget = d.vec3f(0.4, 0, 0);
 
   // Maximum distance a target can be from the body before resetting
-  const MAX_TARGET_DISTANCE = 0.6;
+  const MAX_TARGET_DISTANCE = 0.4;
 
   // Movement tracking for rotation
   const velocity = d.vec3f(); // Current velocity
@@ -590,9 +590,11 @@ export function createFrog(root: TgpuRoot) {
       );
 
       let prefersLeftLeg =
-        (armAnimationPhase / (Math.PI * 2) + 0.2) % 1 > 0.5 && rightLegPlaced;
+        (armAnimationPhase / (Math.PI * 2) + moveMagnitude * 0.2) % 1 > 0.5 &&
+        rightLegPlaced;
       let prefersRightLeg =
-        (armAnimationPhase / (Math.PI * 2) + 0.2) % 1 < 0.5 && !rightLegPlaced;
+        (armAnimationPhase / (Math.PI * 2) + moveMagnitude * 0.2) % 1 < 0.5 &&
+        !rightLegPlaced;
       if (moveMagnitude < 0.1) {
         // We care less about placing steps in synchronicity
         prefersLeftLeg = true;

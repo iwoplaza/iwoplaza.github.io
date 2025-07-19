@@ -16,6 +16,7 @@ import {
   sdCylinder,
   shapeUnion,
   sortHits,
+  smoothstep,
 } from './sdf.ts';
 
 const INSPECT = false;
@@ -257,24 +258,28 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
    * Used to track the min-distance from the frog character recorded during ray marching.
    * Can be used to apply outline effects or other post-processing.
    */
-  const frogDistance = tgpu['~unstable'].privateVar(d.f32, MAX_DIST);
+  const frogMinDistance = tgpu['~unstable'].privateVar(d.f32, MAX_DIST);
+  /**
+   * Complementary information. We want to exclude the points that ended up at the
+   * surface of the frog.
+   */
+  const frogLastDistance = tgpu['~unstable'].privateVar(d.f32, MAX_DIST);
 
   const getSceneDist = tgpu.fn(
     [d.vec3f],
     Shape,
   )((p) => {
     const frogShape = frog.getFrog(p);
-    frogDistance.value = std.min(frogShape.dist, frogDistance.value);
+    frogMinDistance.value = std.min(frogMinDistance.value, frogShape.dist);
+    frogLastDistance.value = frogShape.dist;
 
     // const tree = getPineTree(p);
     const floor = Shape({
       dist: sdPlane(p, d.vec3f(0, 1, 0), 0),
-      color: std.mix(
-        d.vec3f(0.25, 0.65, 0.35),
-        d.vec3f(0.2, 0.6, 0.3),
-        checkerBoard(std.mul(p.xz, 0.3)),
+      color: std.mul(
+        d.vec3f(0.2, 0.3, 0.6),
+        0.9 + checkerBoard(std.mul(p.xz, 0.3)) * 0.1,
       ),
-      // color: d.vec3f(0.15, 0.4, 0.2),
     });
 
     let scene = floor;
@@ -370,12 +375,12 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     d.vec3f,
   )((p) => {
     const dist = getSceneDist(p).dist;
-    const e = 0.01;
+    const e = d.vec2f(0.01, 0);
 
     const n = d.vec3f(
-      getSceneDist(std.add(p, d.vec3f(e, 0, 0))).dist - dist,
-      getSceneDist(std.add(p, d.vec3f(0, e, 0))).dist - dist,
-      getSceneDist(std.add(p, d.vec3f(0, 0, e))).dist - dist,
+      getSceneDist(std.add(p, e.xyy)).dist - dist,
+      getSceneDist(std.add(p, e.yxy)).dist - dist,
+      getSceneDist(std.add(p, e.yyx)).dist - dist,
     );
 
     return std.normalize(n);
@@ -406,16 +411,22 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       std.mul(camera.pov.$.invViewProj, d.vec4f(uv.x, uv.y, 1, 0)).xyz,
     );
 
-    frogDistance.value = MAX_DIST;
+    frogMinDistance.value = MAX_DIST;
+    frogLastDistance.value = MAX_DIST;
     const march = rayMarch(ro, rd);
-    const frogDist = frogDistance.value;
+    const frogMinDist = frogMinDistance.value;
+    const frogLastDist = frogLastDistance.value;
 
-    const thickness =
-      perlin2d.sample(std.mul(std.add(input.uv, std.floor(time.$ * 4)), 60)) *
-        0.07 +
-      0.05;
-    if (std.abs(frogDist - 0.2) < thickness) {
-      return d.vec4f(0, 0, 0, 1);
+    const outlineDispUV = std.mul(std.add(input.uv, std.floor(time.$ * 4)), 50);
+    const thickness = perlin2d.sample(outlineDispUV) * 0.15 + 0.15;
+    const dropShadowR = 0.3;
+    const dropShadowT = std.select(
+      0,
+      std.clamp(1 - (frogMinDist - thickness) / dropShadowR, 0, 1),
+      frogLastDist > 0.1,
+    );
+    if (frogMinDist < thickness && frogLastDist > 0.1) {
+      return d.vec4f(1, 1, 0.9, 1);
     }
 
     const p = std.add(ro, std.mul(rd, march.dist));
@@ -423,7 +434,7 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
 
     const l = std.normalize(d.vec3f(-0.5, 1, 1));
     // const diff = std.max(std.dot(n, l), 0);
-    const diff = std.select(d.f32(0), d.f32(1), std.dot(n, l) > 0);
+    const diff = smoothstep(0, 0.2, std.dot(n, l));
 
     // Soft shadows
     const shadowRo = p;
@@ -441,7 +452,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
       return skyColor;
     }
 
-    return d.vec4f(litColor, 1);
+    return d.vec4f(
+      std.mix(litColor, std.mul(litColor, 0.5), std.pow(dropShadowT, 3)),
+      1,
+    );
   });
 
   const renderPipeline = root['~unstable']
