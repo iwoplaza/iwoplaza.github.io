@@ -417,7 +417,10 @@ export async function game(canvas: HTMLCanvasElement, signal: AbortSignal) {
     const frogMinDist = frogMinDistance.value;
     const frogLastDist = frogLastDistance.value;
 
-    const outlineDispUV = std.mul(std.add(input.uv, std.floor(time.$ * 4)), 50);
+    const outlineDispUV = std.mul(
+      std.add(std.mul(input.uv, camera.pov.$.aspect), std.floor(time.$ * 4)),
+      50,
+    );
     const thickness = perlin2d.sample(outlineDispUV) * 0.15 + 0.15;
     const dropShadowR = 0.3;
     const dropShadowT = std.select(

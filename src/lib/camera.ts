@@ -11,6 +11,7 @@ export interface OrbitOptions {
 
 export const POV = d.struct({
   invView: d.mat4x4f,
+  aspect: d.vec2f,
   invViewProj: d.mat4x4f,
 });
 
@@ -44,12 +45,13 @@ export function createOrbitCamera(
   let orbitYaw = options.yaw;
   let orbitPitch = options.pitch;
 
+  let aspect = 1;
   const invProj = mat4.identity(d.mat4x4f());
   const invView = mat4.identity(d.mat4x4f());
 
   function uploadUniforms() {
     const invViewProj = mat4.mul(invView, invProj, d.mat4x4f());
-    pov.writePartial({ invView, invViewProj });
+    pov.writePartial({ invView, invViewProj, aspect: d.vec2f(aspect, 1) });
   }
 
   const pov = root.createUniform(POV);
@@ -236,7 +238,7 @@ export function createOrbitCamera(
     pov,
     updateTargetPosition,
     updateProjection(width: number, height: number) {
-      const aspect = width / height;
+      aspect = width / height;
       const fov = (24 / 180) * Math.PI;
       mat4.identity(invProj);
       mat4.scale(invProj, d.vec3f(aspect, 1, 1 / Math.tan(fov)), invProj);
