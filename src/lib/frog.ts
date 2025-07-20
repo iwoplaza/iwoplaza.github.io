@@ -200,6 +200,16 @@ const getShin = tgpu.fn(
   };
 });
 
+const getFoot = tgpu.fn(
+  [d.vec3f],
+  Shape,
+)((p) => {
+  return {
+    dist: sdRoundedBox3d(p, d.vec3f(0.6, 0.1, 0.2), 0.05),
+    color: skinColor,
+  };
+});
+
 export const FrogRig = d.struct({
   head: d.mat4x4f,
   body: d.mat4x4f,
@@ -209,8 +219,10 @@ export const FrogRig = d.struct({
   rightForearm: d.mat4x4f,
   leftThigh: d.mat4x4f,
   leftShin: d.mat4x4f,
+  leftFoot: d.mat4x4f,
   rightThigh: d.mat4x4f,
   rightShin: d.mat4x4f,
+  rightFoot: d.mat4x4f,
 });
 
 export function createFrog(root: TgpuRoot) {
@@ -270,6 +282,12 @@ export function createFrog(root: TgpuRoot) {
   const rightShin = new Bone(d.vec3f(0, legChain[0], 0), d.vec4f(), {
     parent: rightThigh,
   });
+  const leftFoot = new Bone(d.vec3f(0, legChain[1], 0), d.vec4f(), {
+    parent: leftShin,
+  });
+  const rightFoot = new Bone(d.vec3f(0, legChain[1], 0), d.vec4f(), {
+    parent: rightShin,
+  });
   const leftArm = new Bone(d.vec3f(-0.7, 1.25, 0), d.vec4f(), { parent: body });
   const rightArm = new Bone(d.vec3f(0.7, 1.25, 0), d.vec4f(), { parent: body });
   const leftForearm = new Bone(d.vec3f(0, armChain[0], 0), d.vec4f(), {
@@ -287,8 +305,10 @@ export function createFrog(root: TgpuRoot) {
     rightForearm: mat4.identity(d.mat4x4f()),
     leftThigh: mat4.identity(d.mat4x4f()),
     leftShin: mat4.identity(d.mat4x4f()),
+    leftFoot: mat4.identity(d.mat4x4f()),
     rightThigh: mat4.identity(d.mat4x4f()),
     rightShin: mat4.identity(d.mat4x4f()),
+    rightFoot: mat4.identity(d.mat4x4f()),
   });
   // Overriding the clones
   frogRigCpu.body = body.invMat;
@@ -297,6 +317,8 @@ export function createFrog(root: TgpuRoot) {
   frogRigCpu.rightThigh = rightThigh.invMat;
   frogRigCpu.leftShin = leftShin.invMat;
   frogRigCpu.rightShin = rightShin.invMat;
+  frogRigCpu.leftFoot = leftFoot.invMat;
+  frogRigCpu.rightFoot = rightFoot.invMat;
   frogRigCpu.leftArm = leftArm.invMat;
   frogRigCpu.rightArm = rightArm.invMat;
   frogRigCpu.leftForearm = leftForearm.invMat;
@@ -319,8 +341,10 @@ export function createFrog(root: TgpuRoot) {
     const rightForearmTP = std.mul(frogRig.$.rightForearm, d.vec4f(p, 1)).xyz;
     const leftThighTP = std.mul(frogRig.$.leftThigh, d.vec4f(p, 1)).xyz;
     const leftShinTP = std.mul(frogRig.$.leftShin, d.vec4f(p, 1)).xyz;
+    const leftFootTP = std.mul(frogRig.$.leftFoot, d.vec4f(p, 1)).xyz;
     const rightThighTP = std.mul(frogRig.$.rightThigh, d.vec4f(p, 1)).xyz;
     const rightShinTP = std.mul(frogRig.$.rightShin, d.vec4f(p, 1)).xyz;
+    const rightFootTP = std.mul(frogRig.$.rightFoot, d.vec4f(p, 1)).xyz;
 
     let skin = shapeUnion(getFrogHead(thp), getArm(leftArmTP));
     skin = smoothShapeUnion(skin, getForearm(leftForearmTP), 0.1);
@@ -328,8 +352,10 @@ export function createFrog(root: TgpuRoot) {
     skin = smoothShapeUnion(skin, getForearm(rightForearmTP), 0.1);
     skin = smoothShapeUnion(skin, getThigh(leftThighTP), 0.1);
     skin = smoothShapeUnion(skin, getShin(leftShinTP), 0.1);
+    skin = smoothShapeUnion(skin, getFoot(leftFootTP), 0.1);
     skin = smoothShapeUnion(skin, getThigh(rightThighTP), 0.1);
     skin = smoothShapeUnion(skin, getShin(rightShinTP), 0.1);
+    skin = smoothShapeUnion(skin, getFoot(rightFootTP), 0.1);
     skin = smoothShapeUnion(skin, getFrogBody(tbp), 0.1);
     const backpack = getBackpack(tbp);
     return shapeUnion(skin, backpack);
@@ -457,9 +483,9 @@ export function createFrog(root: TgpuRoot) {
       // Actual body rotation
       bodyYaw = rootYaw + figure8X * armAmplitude * 0.4;
 
-      // Feet follow body rotation
-      leftFootYaw = rootYaw;
-      rightFootYaw = rootYaw;
+      // Feet face in the direction of the head
+      leftFootYaw = headYaw;
+      rightFootYaw = headYaw;
 
       // BODY
       body.pos.x = rootPos.x;
@@ -740,6 +766,14 @@ export function createFrog(root: TgpuRoot) {
       quatn.fromMat(rightLegMats[1], rightShin.rot);
       quatn.rotateX(rightShin.rot, -Math.PI, rightShin.rot);
       rightShin.compute();
+
+      // Left foot
+      quatn.fromEuler(0, leftFootYaw, 0, 'yxz', leftFoot.rot);
+      leftFoot.compute();
+
+      // Right foot
+      quatn.fromEuler(0, rightFootYaw, 0, 'yxz', rightFoot.rot);
+      rightFoot.compute();
 
       // Draw gizmo for joints
       Gizmo.color(d.vec3f(1));
