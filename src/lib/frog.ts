@@ -205,7 +205,7 @@ const getFoot = tgpu.fn(
   Shape,
 )((p) => {
   return {
-    dist: sdRoundedBox3d(p, d.vec3f(0.6, 0.1, 0.2), 0.05),
+    dist: sdRoundedBox3d(p, d.vec3f(0.2, 0.1, 0.6), 0.05),
     color: skinColor,
   };
 });
@@ -373,6 +373,10 @@ export function createFrog(root: TgpuRoot) {
   const LEG_TRANSITION_DURATION = 0.25; // Duration of leg transition in seconds
   const FOOT_LIFT_HEIGHT = 0.6; // How high to lift the foot during transition
 
+  // Foot yaw transition state
+  let leftFootPrevYaw = 0;
+  let rightFootPrevYaw = 0;
+
   // Initialize previous leg target positions
   vec3.copy(leftLegTarget, leftLegPrevTarget);
   vec3.copy(rightLegTarget, rightLegPrevTarget);
@@ -483,9 +487,8 @@ export function createFrog(root: TgpuRoot) {
       // Actual body rotation
       bodyYaw = rootYaw + figure8X * armAmplitude * 0.4;
 
-      // Feet face in the direction of the head
-      leftFootYaw = headYaw;
-      rightFootYaw = headYaw;
+      // Update foot yaw during transitions, otherwise keep current orientation
+      const targetFootYaw = headYaw;
 
       // BODY
       body.pos.x = rootPos.x;
@@ -674,6 +677,7 @@ export function createFrog(root: TgpuRoot) {
       ) {
         rightLegPlaced = false;
         vec3.copy(leftLegTarget, leftLegPrevTarget);
+        leftFootPrevYaw = leftFootYaw;
         leftLegInTransition = true;
         leftLegTransitionTime = 0;
       }
@@ -686,6 +690,7 @@ export function createFrog(root: TgpuRoot) {
       ) {
         rightLegPlaced = true;
         vec3.copy(rightLegTarget, rightLegPrevTarget);
+        rightFootPrevYaw = rightFootYaw;
         rightLegInTransition = true;
         rightLegTransitionTime = 0;
       }
@@ -707,6 +712,14 @@ export function createFrog(root: TgpuRoot) {
           leftLegPrevTarget.y +
           (leftPick.y - leftLegPrevTarget.y) * smoothT +
           liftAmount;
+
+        // Interpolate foot yaw
+        const leftYawDiff = targetFootYaw - leftFootPrevYaw;
+        const normalizedLeftYawDiff = Math.atan2(
+          Math.sin(leftYawDiff),
+          Math.cos(leftYawDiff),
+        );
+        leftFootYaw = leftFootPrevYaw + normalizedLeftYawDiff * smoothT;
       }
 
       if (rightLegInTransition) {
@@ -725,6 +738,14 @@ export function createFrog(root: TgpuRoot) {
           rightLegPrevTarget.y +
           (rightPick.y - rightLegPrevTarget.y) * smoothT +
           liftAmount;
+
+        // Interpolate foot yaw
+        const rightYawDiff = targetFootYaw - rightFootPrevYaw;
+        const normalizedRightYawDiff = Math.atan2(
+          Math.sin(rightYawDiff),
+          Math.cos(rightYawDiff),
+        );
+        rightFootYaw = rightFootPrevYaw + normalizedRightYawDiff * smoothT;
       }
 
       const leftLegPoints = solveIK(
