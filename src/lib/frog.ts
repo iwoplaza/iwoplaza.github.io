@@ -27,6 +27,26 @@ const backpackColor = d.vec3f(0.4, 0.4, 0.1);
 // const skinColor = d.vec3f(0.8, 0.6, 0.2);
 // const backpackColor = d.vec3f(0.2, 0.4, 0.6);
 
+// Maximum distance a target can be from the body before resetting
+const MAX_TARGET_DISTANCE = 0.4;
+
+// Rotation parameters
+const HEAD_ROTATION_SPEED = 8.0; // How quickly the head turns to face movement
+const BODY_ROTATION_SPEED = 7; // How quickly the body follows the head (slower for follow-through)
+const MIN_MOVEMENT_THRESHOLD = 0.01; // Minimum movement required to change direction
+
+// Movement parameters
+const MAX_SPEED = 8; // Maximum movement speed
+const ACCELERATION = 20; // How quickly velocity approaches target movement
+const DECELERATION = 15; // How quickly velocity decelerates when no input
+
+// Arm animation parameters
+const INITIAL_ARM_ANIMATION_PHASE = 0; // Initial phase of the arm animation
+const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
+const ARM_MAX_AMPLITUDE = 1; // Maximum amplitude when moving at full speed
+const BASE_ARM_ANIMATION_SPEED = 2.5; // Base speed of the figure-8 animation
+const ARM_ANIMATION_SPEED = 9; // Speed of the figure-8 animation
+
 const getFrogHead = tgpu.fn(
   [d.vec3f],
   Shape,
@@ -236,29 +256,10 @@ export function createFrog(root: TgpuRoot) {
   const leftLegTarget = d.vec3f(-0.4, 0, 0);
   const rightLegTarget = d.vec3f(0.4, 0, 0);
 
-  // Maximum distance a target can be from the body before resetting
-  const MAX_TARGET_DISTANCE = 0.4;
-
   // Movement tracking for rotation
   const velocity = d.vec3f(); // Current velocity
   const movement = d.vec3f(); // Desired movement direction and magnitude
 
-  // Rotation parameters
-  const HEAD_ROTATION_SPEED = 8.0; // How quickly the head turns to face movement
-  const BODY_ROTATION_SPEED = 7; // How quickly the body follows the head (slower for follow-through)
-  const MIN_MOVEMENT_THRESHOLD = 0.01; // Minimum movement required to change direction
-
-  // Movement parameters
-  const MAX_SPEED = 8; // Maximum movement speed
-  const ACCELERATION = 20; // How quickly velocity approaches target movement
-  const DECELERATION = 15; // How quickly velocity decelerates when no input
-
-  // Arm animation parameters
-  const INITIAL_ARM_ANIMATION_PHASE = 0; // Initial phase of the arm animation
-  const ARM_FIGURE8_BASE_AMPLITUDE = 0.02; // Base amplitude of the figure-8 pattern
-  const ARM_MAX_AMPLITUDE = 1; // Maximum amplitude when moving at full speed
-  const BASE_ARM_ANIMATION_SPEED = 2.5; // Base speed of the figure-8 animation
-  const ARM_ANIMATION_SPEED = 9; // Speed of the figure-8 animation
   let armAnimationPhase = INITIAL_ARM_ANIMATION_PHASE; // Current phase of the arm animation
 
   let progress = 0;
@@ -373,7 +374,7 @@ export function createFrog(root: TgpuRoot) {
   let rightLegTransitionTime = 0;
   let leftLegInTransition = false;
   let rightLegInTransition = false;
-   // Duration of leg transition in seconds
+  // Duration of leg transition in seconds
   const LEG_TRANSITION_DURATION_BASE = 0.4;
   const LEG_TRANSITION_DURATION_SLOPE = -0.2;
   const FOOT_LIFT_HEIGHT = 0.7; // How high to lift the foot during transition
@@ -656,7 +657,9 @@ export function createFrog(root: TgpuRoot) {
       const leftLegTargetDist = vec3.distance(leftLegTarget, leftPick);
       const rightLegTargetDist = vec3.distance(rightLegTarget, rightPick);
 
-      const legTransitionDuration = LEG_TRANSITION_DURATION_BASE + LEG_TRANSITION_DURATION_SLOPE * moveMagnitude;
+      const legTransitionDuration =
+        LEG_TRANSITION_DURATION_BASE +
+        LEG_TRANSITION_DURATION_SLOPE * moveMagnitude;
 
       // Update leg transition timers
       if (leftLegInTransition) {
